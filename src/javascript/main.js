@@ -2,18 +2,18 @@
 ########################################
               MIT License
 
-Copyright (c) 2019 Marc Espín Sanz
+Copyright (c) 2019 Marc Espin Sanz
 
 License > https://github.com/Graviton-Code-Editor/Graviton-App/blob/master/LICENSE.md
 
 #########################################
 */
 
-"use strict"
+"use strict";
 
-const g_version = {
-  date: "190809",
-  version: "1.0.3",
+const GravitonInfo = {
+  date: "190819",
+  version: "1.2.0",
   state: "Beta"
 };
 const os = require("os"),
@@ -29,8 +29,132 @@ const os = require("os"),
   { systemPreferences } = require("electron").remote,
   url = require("url"),
   marked = require("marked"),
-  updater = require("./src/javascript/updater") /*Import the update module*/,
-  fit = require("./node_modules/xterm/lib/addons/fit/fit.js");
+  fit = require("./node_modules/xterm/lib/addons/fit/fit.js"),
+  CodeMirror = require("codemirror"),
+  semver = require("semver"),
+  request = require("request");
+
+require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "codemirror-langs.js"
+)).langs(); //Load CodeMirror files
+const { elasticContainerComponent, elasticContainer } = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "elastic_container.js"
+));
+graviton.loadEditor = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "editors.js"
+)).loadEditor;
+window.customElements.define("elastic-container", elasticContainerComponent);
+
+const { loadLanguage, getTranslation } = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "languages.js"
+));
+const { getFormat, getLanguageName, updateCodeMode } = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "format.js"
+));
+const screens = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "screens.js"
+));
+const updater = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "updater.js"
+));
+graviton.setTheme = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "theming.js"
+)).setTheme;
+
+const Settings = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "windows",
+  "settings.js"
+)).Settings;
+const Welcome = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "windows",
+  "welcome.js"
+)).Welcome;
+const Setup = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "windows",
+  "setup.js"
+)).Setup;
+const Market = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "windows",
+  "market.js"
+)).Market;
+const NewProject = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "windows",
+  "new_project.js"
+)).NewProject;
+const Plugins = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "plugins.js"
+)).Plugins;
+const Menus = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "menus.js"
+)).Menus;
+const Explorer = require(path.join(
+  __dirname,
+  "src",
+  "javascript",
+  "api",
+  "explorer.js"
+)).Explorer;
+
+window.customElements.define(
+  "gv-switch",
+  require(path.join(__dirname, "src", "javascript", "api", "switch.js")).Switch
+);
+
 let current_screen,
   dir_path,
   i,
@@ -39,7 +163,7 @@ let current_screen,
   tabs = [],
   FirstFolder = null,
   editingTab,
-  plang = " ",
+  plang = "",
   _notifications = [],
   filepath = null,
   editors = [],
@@ -59,16 +183,36 @@ let current_screen,
       ).getPropertyValue("--accentLightColor"),
       accentDarkColor: getComputedStyle(
         document.documentElement
-      ).getPropertyValue("--accentDarkColor")
+      ).getPropertyValue("--accentDarkColor"),
+      "editor-background-color": getComputedStyle(
+        document.documentElement
+      ).getPropertyValue("--editor-background-color")
     }
   },
   new_update = false,
   mouseClicked = false,
   touchingResizerValue = false,
   editor_screens = [],
-  dictionary = autocomplete;
+  languages = [],
+  dictionary = autocomplete,
+  Mousetrap = require("mousetrap"),
+  terminal = null,
+  workspaces = [],
+  plugins_market = [],
+  current_plugins = 0;
 
-if(graviton.isProduction()){
+let templates = {},
+  plugins_list = [],
+  plugins_dbs = [],
+  anyDropON = null,
+  full_plugins = [];
+
+const default_plugins = [
+  "Graviton-Code-Editor/Dark",
+  "Graviton-Code-Editor/Arctic"
+]; //Plugins which are installed in the setup process
+
+if (graviton.isProduction()) {
   DataFolderDir = path.join(getAppDataPath(), ".graviton");
 }
 
@@ -101,9 +245,14 @@ document.addEventListener(
   function(event) {
     if (mouseClicked && touchingResizerValue) {
       const explorer = document.getElementById("explorer_app");
-      explorer.style = `width: ${event.clientX - 3}px`;
-      for(i=0;i<editors.length;i++){
-        editors[i].object.blur()
+      const content_app = document.getElementById("content_app");
+      if (current_config.explorerPosition === "left") {
+        explorer.style = `width: ${event.clientX - 3}px`;
+      } else {
+        explorer.style = `width: ${content_app.clientWidth - event.clientX}px`;
+      }
+      for (i = 0; i < editors.length; i++) {
+        editors[i].object.blur();
       }
       graviton.resizeTerminals();
     }
@@ -111,425 +260,62 @@ document.addEventListener(
   true
 );
 
+preload([
+  "src/icons/folder_opened.svg",
+  "src/icons/custom_icons/git.svg",
+  "src/icons/custom_icons/node_modules.svg"
+]);
 
-function updateTitle(text) {
-  if (graviton.currentOS().codename == "win32") {
-    document.getElementById("title_directory").children[0].innerText =
-      text + " · Graviton";
-  } else {
-    g_window.setTitle(text + " · Graviton");
-  }
-}
-updateTitle(`v${g_version.version}`); //Initial title
-const loadEditor = info => {
-  if (
-    document.getElementById(info.dir.replace(/\\/g, "") + "_editor") ==
-    undefined
-  ) {
-    switch (info.type) {
-      case "text":
-        const text_container = document.createElement("div");
-        text_container.classList = "code-space";
-        text_container.setAttribute(
-          "id",
-          info.dir.replace(/\\/g, "") + "_editor"
-        );
-        text_container.setAttribute("path", info.dir);
-        document
-          .getElementById(current_screen.id)
-          .children[1].appendChild(text_container);
-        let codemirror = CodeMirror(
-          document.getElementById(text_container.id),
-          {
-            value: info.data,
-            mode: "text/plain",
-            htmlMode: false,
-            theme:
-              themeObject["highlight"] != undefined
-                ? themeObject["highlight"]
-                : "default",
-            lineNumbers: true,
-            autoCloseTags: true,
-            indentUnit: 2,
-            id: info.dir,
-            styleActiveLine: true,
-            foldGutter: true,
-            gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
-            lineWrapping:
-              current_config["lineWrappingPreferences"] == "activated"
-          }
-        );
-        codemirror.focus()
-        codemirror.setOption("miniMap",current_config.miniMapPreferences=="activated"?true:false)
-        const new_editor_text = {
-          object: text_container,
-          id: text_container.id,
-          editor: codemirror,
-          path: info.dir,
-          screen: info.screen,
-          type: info.type
-        };
-        elasticContainer.append(text_container.children[0].children[Number(text_container.children[0].children.length-1)])
-        editors.push(new_editor_text);
-        if (g_highlighting == "activated") updateCodeMode(codemirror, info.dir);
-        graviton.changeLanguageStatusBar(getLanguageName(
-          getFormat(path.basename(info.dir)) != "unknown"
-            ? getFormat(path.basename(info.dir))
-            : path
-                .basename(info.dir)
-                .split(".")
-                .pop()
-        ),info.screen);
-        for (i = 0; i < editors.length; i++) {
-          if (
-            editors[i].screen == info.screen &&
-            document.getElementById(editors[i].id) != null
-          ) {
-            document.getElementById(editors[i].id).style.display = "none";
-          }
-        }
-        editorID = new_editor_text.id;
-        editor = new_editor_text.editor;
-        text_container.style.display = "block";
-        codemirror.on("focus", function(a) {
-          for (i = 0; i < editors.length; i++) {
-            if (editors[i].id == a.options.id.replace(/[\\\s]/g, "") + "_editor") {
-              editor = editors[i].editor;
-              editorID = editors[i].id;
-              for (let b = 0; b < tabs.length; b++) {
-                if (
-                  tabs[b].getAttribute("screen") == editors[i].screen &&
-                  tabs[b].classList.contains("selected")
-                ) {
-                  editingTab = tabs[b].id;
-                  filepath = tabs[b].getAttribute("longpath");
-                }
-              }
-            }
-          }
-        });
-        break;
-      case "image":
-        const image_container = document.createElement("div");
-        image_container.classList = "code-space";
-        image_container.setAttribute(
-          "id",
-          `${info.dir.replace(/\\/g, "")}_editor`
-        );
-        image_container.innerHTML = `<img src="${info.dir}">`;
-        document
-          .getElementById(current_screen.id)
-          .children[1].appendChild(image_container);
-        const new_editor_image = {
-          object:image_container,
-          id: info.dir.replace(/\\/g, "") + "_editor",
-          editor: undefined,
-          path: info.dir,
-          screen: info.screen
-        };
-        for (i = 0; i < editors.length; i++) {
-          if (
-            editors[i].screen == info.screen &&
-            document.getElementById(editors[i].id) != null
-          ) {
-            document.getElementById(editors[i].id).style.display = "none";
-          }
-        }
-        editors.push(new_editor_image);
-        document.getElementById(
-          info.dir.replace(/\\/g, "") + "_editor"
-        ).style.display = "block";
-        editorID = new_editor_image.id;
-        graviton.changeLanguageStatusBar("Image",info.screen)
-        break;
-      case "free":
-        const free_id = "free_tab" + Math.random();
-        const free_container = document.createElement("div");
-        free_container.classList = "code-space";
-        free_container.setAttribute(
-          "id",
-          `${info.dir.replace(/\\/g, "")}_editor`
-        );
-        free_container.innerHTML = info.data != undefined ? info.data : "";
-        document
-          .getElementById(current_screen.id)
-          .children[1].appendChild(free_container);
-        const new_editor_free = {
-          object: free_container,
-          id: info.dir.replace(/\\/g, "") + "_editor",
-          editor: null,
-          path: null,
-          screen: info.screen,
-          type: "free"
-        };
-        for (i = 0; i < editors.length; i++) {
-          if (
-            editors[i].screen == info.screen &&
-            document.getElementById(editors[i].id) != null
-          ) {
-            document.getElementById(editors[i].id).style.display = "none";
-          }
-        }
-        editors.push(new_editor_free);
-        document.getElementById(
-          info.dir.replace(/\\/g, "") + "_editor"
-        ).style.display = "block";
-        editorID = new_editor_free.id;
-        graviton.changeLanguageStatusBar("",info.screen);
-        break;
-    }
-  } else {
-    // Editor exists
-    for (i = 0; i < editors.length; i++) {
-      if (
-        editors[i].screen == info.screen &&
-        document.getElementById(editors[i].id) != null
-      ) {
-        document.getElementById(editors[i].id).style.display = "none";
-      }
-      if (editors[i].id == info.dir.replace(/\\/g, "") + "_editor") {
-        if (editors[i].editor != undefined) {
-          // Editors
-          editor = editors[i].editor;
-          graviton.changeLanguageStatusBar(getLanguageName(
-            getFormat(path.basename(info.dir)) != "unknown"
-              ? getFormat(path.basename(info.dir))
-              : path
-                  .basename(info.dir)
-                  .split(".")
-                  .pop()
-          ),info.screen);
-        } else if (info.type != "free") {
-          // Images
-          graviton.changeLanguageStatusBar("Image",info.screen);
-        } else {
-          //Free tabs (custom)
-          graviton.changeLanguageStatusBar("",info.screen);
-        }
-        editorID = editors[i].id;
-        document.getElementById(editorID).style.display = "block";
-        if (editor != undefined) editor.refresh();
-      }
-    }
-  }
-
-  function filterIt(arr, searchKey, cb) {
-    var list = [];
-    for (var i = 0; i < arr.length; i++) {
-      var curr = arr[i];
-      Object.keys(curr).some(function(key) {
-        if (typeof curr[key] === "string" && curr[key].includes(searchKey)) {
-          list.push(curr);
-        }
-      });
-    }
-    return cb(list);
-  }
-  if (editor != undefined) {
-    editor.on("change", function() {
-      const close_icon = document.getElementById(editingTab);
-      close_icon.setAttribute("file_status", "unsaved");
-      close_icon.children[1].innerHTML = icons["unsaved"];
-      document
-        .getElementById(editingTab)
-        .setAttribute("data", editor.getValue());
-      if (current_config["autoCompletionPreferences"] == "activated") {
-        elasticContainer.append(document.getElementById('context'))
-        const cursorPos = editor.cursorCoords();
-        const A1 = editor.getCursor().line;
-        const A2 = editor.getCursor().ch;
-        const B1 = editor.findWordAt({ line: A1, ch: A2 }).anchor.ch;
-        const B2 = editor.findWordAt({ line: A1, ch: A2 }).head.ch;
-        const lastWord = editor.getRange(
-          { line: A1, ch: B1 },
-          { line: A1, ch: B2 }
-        );
-        const context = document.getElementById("context");
-        if (context.style.display == "block") return;
-        const selectedLangNum = (function() {
-          for (i = 0; i < dictionary.length; i++) {
-            if (
-              dictionary[i].name ==
-              path
-                .basename(graviton.getCurrentFile().path)
-                .split(".")
-                .pop()
-            ) {
-              return i;
-            }
-          }
-        })();
-        if(selectedLangNum==undefined) return;
-        let dic = dictionary[selectedLangNum].list;
-        const vars = look(
-          editor.getValue()
-          .replace (/(\r\n|\n|\r)/gm, ' ')
-          .split (
-            /\s|(\()([\w\s!?="`[<>,\/*':&.;_-{}]+)(\))|\s|(\<)([\w\s!?="`[,\/*()':&.;_-{}]+)(\>)|\s|(\()([\w\s!?="<>`[,'+:&.;_-{}]+)(\))\s|(\B\$)(\w+)|\s(\/\*)([\w\s!?()="<>`[':.;_-{}]+)(\*\/)|("[\w\s!?():=`.;_-{}]+")\s|(%%)([\w\s!?()="+<>`[\/'*,.;_-{}]+)(%%)|("[\w\s!?()='.`;_-{}]+")/g
-          ).filter(Boolean)
-        )
-        dic = dic.concat(vars)
-        filterIt(dic, lastWord, function(
-          filterResult
-        ) {
-          if (filterResult.length > 0 && lastWord.length >= 3) {
-            let contextOptions;
-            for (var i = 0; i < filterResult.length; i++) {
-              const id = Math.random();
-              contextOptions +=
-                `<button id=${id} class=option > 
-                ${filterResult[i]._name}
-                </button>`;
-              contextOptions = contextOptions.replace("undefined", "");
-              context.innerHTML = contextOptions;
-              sleeping(1).then(() => {
-                if (document.getElementById(id) == null) return;
-                document.getElementById(id).onclick = function() {
-                  const A1 = editor.getCursor().line;
-                  const A2 = editor.getCursor().ch;
-                  const B1 = editor.findWordAt({ line: A1, ch: A2 }).anchor.ch;
-                  const B2 = editor.findWordAt({ line: A1, ch: A2 }).head.ch;
-                  const selected = this.innerText;
-                  editor.replaceRange(
-                    selected,
-                    { line: A1, ch: B1 },
-                    { line: A1, ch: B2 }
-                  );
-                  context.parentElement.style.display = "none";
-                  context.innerHTML = "";
-                };
+window.onload = function() {
+  fs.readdir(path.join(__dirname, "src", "templates"), (err, paths) => { /* Load UI templates */
+    let temporal_count = 0;
+    paths.forEach((dir, index) => {
+      fs.readFile(
+        path.join(__dirname, "src", "templates", dir),
+        "utf8",
+        function(err, data) {
+          templates[path.basename(dir, ".js")] = data;
+          temporal_count++;
+          if (temporal_count == paths.length) {
+            fs.readdir(path.join(__dirname, "languages"), (err, paths) => {  /* Load languages */
+              let path_count = paths.length;
+              paths.forEach(dir => {
+                fs.readFile(
+                  path.join(__dirname, "languages", dir),
+                  "utf8",
+                  function(err, data) {
+                    if (err) throw err;
+                    let _err_parsing = false;
+                    try {
+                      JSON.parse(data);
+                    } catch {
+                      path_count--;
+                      graviton.consoleWarn(
+                        "Couldn't parse the language: " + dir
+                      );
+                      _err_parsing = true;
+                    }
+                    if (!_err_parsing) {
+                      languages.push(JSON.parse(data)); // Push the language
+                    }
+                    if (languages.length === path_count) {
+                      graviton.loadControlButtons();
+                      loadConfig();
+                      graviton.consoleInfo("All templates have been loaded.");
+                    }
+                  }
+                );
               });
-            }
-            context.parentElement.style = `top:${cursorPos.top + 30}px; left:${
-              cursorPos.left
-            }px; display:block;`;
-            if (cursorPos.top < window.innerHeight / 2) {
-            } //Cursor is above the mid height
-            context.children[0].classList.add("hover");
-          } else if (filterResult.length === 0 || lastWord.length < 3) {
-            context.parentElement.style.display = "none";
-            context.innerHTML = "";
-          }
-        });
-      }
-    });
-    editor.on("keydown", function(editor, e) {
-      if (
-        document.getElementById("context").parentElement.style.display != "none"
-      ) {
-        editor.setOption("extraKeys", {
-          Up: function() {
-            return CodeMirror.PASS;
-          },
-          Down: function() {
-            return CodeMirror.PASS;
-          },
-          Enter: function() {
-            return CodeMirror.PASS;
-          },
-          Tab: function() {
-            return CodeMirror.PASS;
-          },
-        });
-      } else {
-        editor.setOption("extraKeys", {
-          Up: "goLineUp",
-          Down:"goLineDown"
-        });
-      }
-      const context = document.getElementById("context");
-      const childs = context.querySelectorAll(".option");
-      for (i = 0; i < childs.length; i++) {
-        if (childs[i].classList.contains("hover")) {
-          if (
-            e.keyCode === 40 &&
-            i != childs.length - 1 &&
-            context.style.display != "none"
-          ) {
-            //DOWN
-            childs[i].classList.remove("hover");
-            childs[i + 1].classList.add("hover");
-            context.scrollBy(0, 30);
-            return false;
-          } else if (
-            e.keyCode === 38 &&
-            i != 0 &&
-            context.style.display != "none"
-          ) {
-            //UP
-            childs[i].classList.remove("hover");
-            childs[i - 1].classList.add("hover");
-            context.scrollBy(0, -30);
-            return false;
-          }
-          if (e.keyCode === 9 || e.keyCode === 13) {
-            //9 = Tab & 13 = Enter
-            const A1 = editor.getCursor().line;
-            const A2 = editor.getCursor().ch;
-            const B1 = editor.findWordAt({ line: A1, ch: A2 }).anchor.ch;
-            const B2 = editor.findWordAt({ line: A1, ch: A2 }).head.ch;
-            const selected = (function() {
-              for (i = 0; i < childs.length; i++) {
-                if (childs[i].classList.contains("hover")) {
-                  return childs[i].innerText;
-                }
-              }
-            })();
-            editor.replaceRange(
-              selected,
-              { line: A1, ch: B1 },
-              { line: A1, ch: B2 }
-            );
-            context.innerHTML = "";
-            setTimeout(function() {
-              context.parentElement.style.display = "none";
-              context.innerHTML = "";
-            }, 1);
+            });
           }
         }
-      }
+      );
     });
-    editor.addKeyMap({
-      "Ctrl-S": function(cm) {
-        saveFile();
-      },
-      "Ctrl-N": function(cm) {
-        screens.add();
-      },
-      "Ctrl-L": function(cm) {
-        screens.remove(current_screen.id);
-      },
-      "Ctrl-E": function(cm) {
-        graviton.toggleZenMode();
-      },
-      "Ctrl-T": function(cm) {
-        if (current_screen.terminal != undefined) {
-          commanders.show(current_screen.terminal.id);
-          return;
-        }
-        commanders.terminal();
-      },
-      "Ctrl-U": function(cm) {
-        commanders.closeTerminal();
-      },
-      "Ctrl-H": function(cm) {
-        if (current_screen.terminal != undefined) {
-          commanders.hide(current_screen.terminal.id);
-        }
-      },
-      'F11': function(cm) {
-        if (g_window.isFullScreen() == false) {
-          g_window.setFullScreen(true);
-        } else {
-          g_window.setFullScreen(false);
-        }
-      },
-      "Ctrl-Tab": function(cm) {
-        graviton.toggleMenus();
-      }
-    });
-  }
+  });
 };
+
+graviton.setTitle(`v${GravitonInfo.version}`); //Initial title
+
 const appendBinds = () => {
   Mousetrap.bind("mod+s", function() {
     saveFile();
@@ -544,8 +330,8 @@ const appendBinds = () => {
     graviton.toggleZenMode();
   });
   Mousetrap.bind("mod+t", function() {
-    if (current_screen.terminal != undefined) {
-      commanders.show(current_screen.terminal.id);
+    if (terminal != null) {
+      commanders.show(terminal.id);
       return;
     }
     commanders.terminal();
@@ -554,8 +340,8 @@ const appendBinds = () => {
     commanders.closeTerminal();
   });
   Mousetrap.bind("mod+h", function() {
-    if (current_screen.terminal != undefined) {
-      commanders.hide(current_screen.terminal.id);
+    if (terminal != null) {
+      commanders.hide(terminal.id);
     }
   });
   Mousetrap.bind("f11", function() {
@@ -575,8 +361,8 @@ function saveFileAs() {
       }
       filepath = fileName;
       new Notification({
-        title:"Graviton",
-        content:`The file has been succesfully saved in ${fileName}`
+        title: "Graviton",
+        content: `The file has been succesfully saved in ${fileName}`
       });
     });
   });
@@ -598,269 +384,153 @@ function openFile() {
 }
 
 function openFolder() {
-  dialog.showOpenDialog({ properties: ["openDirectory"] }, selectedFiles => {
-    if (selectedFiles === undefined) return;
-    loadDirs(selectedFiles[0], "g_directories", true);
-  });
+  dialog.showOpenDialog(
+    {
+      properties: ["openDirectory"]
+    },
+    selectedFiles => {
+      if (selectedFiles === undefined) return;
+      Explorer.load(selectedFiles[0], "g_directories", true);
+    }
+  );
 }
 
 function saveFile() {
-  if (graviton.getCurrentEditor().editor != undefined) {
-    fs.writeFile(filepath, editor.getValue(), err => {
-      if (err) return err;
-      document.getElementById(editingTab).setAttribute("file_status", "saved");
-      document
-        .getElementById(editingTab)
-        .children[1].setAttribute(
-          "onclick",
-          document
-            .getElementById(editingTab)
-            .children[1].getAttribute("onclose")
-        );
-      document.getElementById(editingTab).children[1].innerHTML =
-        icons["close"];
-      const file_saved_event = new CustomEvent("file_saved", {
-        data: {
-          object: graviton.getCurrentEditor().object
-        }
-      });
-      document.dispatchEvent(file_saved_event);
+  if (graviton.getCurrentEditor() === null) return;
+  if (graviton.getCurrentEditor().editor === undefined) return;
+  fs.writeFile(filepath, editor.getValue(), err => {
+    if (err) return err;
+    document.getElementById(editingTab).setAttribute("file_status", "saved");
+    document
+      .getElementById(editingTab)
+      .children[1].setAttribute(
+        "onclick",
+        document.getElementById(editingTab).children[1].getAttribute("onclose")
+      );
+    document.getElementById(editingTab).children[1].innerHTML = icons["close"];
+    const file_saved_event = new CustomEvent("file_saved", {
+      data: {
+        object: graviton.getCurrentEditor().object
+      }
     });
-  }
-}
-
-function loadDirs(dir, app_id, f_t,callback) {
-  const first_time =
-    f_t == (true || "true") ? true : f_t == "reload" ? false : f_t;
-  if (!fs.existsSync(dir)) {
-    graviton.throwError(current_config.language["DirectoryDoesntExist"]);
-    return;
-  }
-  const appender_id = app_id.replace(/\\/g, "");
-  if (appender_id == "g_directories") {
-    document.getElementById(
-      "explorer_app"
-    ).innerHTML = `<div global=true dir="${dir}" id="g_directories"></div>`;
-    dir_path = dir;
-  }
-  let working_folder;
-  FirstFolder = dir;
-  const appender = document.getElementById(appender_id);
-  if (f_t == "reload") {
-    appender.setAttribute("opened", "true");
-    appender.children[0].children[0].setAttribute(
-      "src",
-      directories.getCustomIcon(path.basename(FirstFolder), "close")
-    );
-    appender.children[1].innerHTML = "";
-    const click = document.getElementById(appender_id).children[0];
-    click.children[0].setAttribute(
-      "src",
-      directories.getCustomIcon(path.basename(FirstFolder), "open")
-    );
-  } else {
-    if (appender.getAttribute("opened") == "true") {
-      appender.setAttribute("opened", "false");
-      appender.children[0].children[0].setAttribute(
-        "src",
-        directories.getCustomIcon(path.basename(FirstFolder), "close")
-      );
-      appender.children[1].innerHTML = "";
-      return;
-    } else {
-      document.getElementById(appender_id).setAttribute("opened", "true");
-      if (first_time == false) {
-        const click = document.getElementById(appender_id).children[0];
-        click.children[0].setAttribute(
-          "src",
-          directories.getCustomIcon(path.basename(FirstFolder), "open")
-        );
-      }
-    }
-  }
-  if (first_time) {
-    updateTitle(FirstFolder);
-    if (document.getElementById("openFolder") != null)
-      document.getElementById("openFolder").remove();
-    registerNewProject(dir);
-    working_folder = document.createElement("div");
-    for (i = 0; i < document.getElementById(appender_id).children.length; i++) {
-      document.getElementById(appender_id).children[i].remove();
-    }
-    document.getElementById(appender_id).setAttribute("opened", "false");
-    working_folder.setAttribute("id", "g_directory");
-    working_folder.setAttribute("myPadding", "50");
-    working_folder.innerHTML = `
-      <div>
-        <p global=true id=directory_${path.basename(
-          dir
-        )} parent=g_directories elementType=directory dir=${FirstFolder}>${path.basename(
-      dir
-    )}</p>
-      </div>`;
-    document.getElementById(appender_id).appendChild(working_folder);
-  } else {
-    working_folder = document.getElementById(appender_id).children[1];
-  }
-  const paddingListDir =
-    Number(document.getElementById(appender_id).getAttribute("myPadding")) + 7; // Add padding
-  fs.readdir(dir, (err, paths) => {
-    if (paths == undefined || err) {
-      graviton.throwError(
-        "Cannot read files on the directory :" +
-          FirstFolder +
-          ". Check the permissions."
-      );
-      return;
-    }
-    for (i = 0; i < paths.length; i++) {
-      let _long_path = path.join(dir, paths[i]);
-      if (graviton.currentOS().codename == "win32") {
-        _long_path = _long_path.replace(/\\/g, "\\\\");
-      }
-      const stats = fs.statSync(_long_path);
-      if (stats.isDirectory()) {
-        const directory_temp = document.createElement("div");
-        const parent_id =  _long_path.replace(/[\\\s]/g, "") + "_div";
-        directory_temp.innerHTML += `
-        <div title=${path.join(dir, paths[i])} global=reload dir="${_long_path}"  opened="false" ID="${parent_id}" name="${
-          paths[i]
-        }" style="padding-left:${paddingListDir}px; vertical-align:middle;">
-          <div parent=${parent_id}  ID="${parent_id +"_div"}" elementType=directory global=reload dir="${_long_path}"  class="directory" onclick="loadDirs('${_long_path}','${parent_id}',false)">
-            <img parent=${parent_id} ID="${parent_id+ "_img"}" elementType=directory global=reload dir="${_long_path}" style="float:left; padding-right:3px; height:22px; width:24px; " src="${directories.getCustomIcon(
-          paths[i],
-          "close"
-        )}">
-            <p parent=${parent_id} ID="${parent_id+ "_p"}" elementType=directory global=reload dir="${_long_path}">
-            ${paths[i]}
-            </p> 
-          </div>
-          <div myPadding="${paddingListDir}" dir="${_long_path}"></div>
-        </div>`;
-        working_folder.appendChild(directory_temp);
-      }
-    }
-    for (i = 0; i < paths.length; i++) {
-      let _long_path = path.join(dir, paths[i]);
-      if (graviton.currentOS().codename == "win32") {
-        _long_path = _long_path.replace(/\\/g, "\\\\");
-      } 
-      const stats = fs.statSync(_long_path);
-      if (stats.isFile()) {
-        const file_temp = document.createElement("div");
-        const parent_id =  _long_path.replace(/[\\\s]/g, "") +"_div";
-        file_temp.innerHTML += `
-        <div title=${path.join(dir, paths[i])} parent="${parent_id}" elementType="directorie" onclick="new Tab({
-          id:'${parent_id + "B"}',
-          path:'${_long_path}',
-          name:'${paths[i]}',
-          type:'file'
-        })" myPadding="${paddingListDir}" dir="${_long_path}" class="directory" ID="${parent_id}" name="${
-          paths[i]
-        }" style=" margin-left:${paddingListDir}px; vertical-align:middle;">
-          <img parent="${parent_id}" ID="${parent_id +"_img"}" dir="${_long_path}" elementType="directorie" style="float:left; padding-right:3px; height:24px; width:24px;" src="src/icons/files/${getFormat(
-          paths[i]
-        )}.svg">
-          <p parent="${parent_id}" ID="${parent_id+"_p"}" dir="${_long_path}" elementType="directorie">
-          ${paths[i]}
-          </p>
-        </div>`;
-        working_folder.appendChild(file_temp);
-      }
-    }
-    callback!=undefined?callback():"";
+    document.dispatchEvent(file_saved_event);
   });
 }
-const create ={
-  folder: function(id,value){
-    const element =  document.getElementById(id)
-    const dir = path.join(element.getAttribute('dir'),value)
-    if (!fs.existsSync(dir)){
-        fs.mkdirSync(dir);
-        loadDirs(
-          element.getAttribute('dir'),
-          element.id,
-          element.getAttribute("global")
-        ,function(){
-          //Created the new folder
-        });
-    }else{
+
+const create = {
+  folder: function(id, value) {
+    const element = document.getElementById(id);
+    const dir = path.join(element.getAttribute("dir"), value);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
+      Explorer.load(
+        element.getAttribute("dir"),
+        element.id,
+        element.getAttribute("global"),
+        () => { /* created folder */ } 
+      );
+    } else {
       new Notification({
-        title:"Graviton",
-        content:getTranslation("ExplorerError2")
-      })
+        title: "Graviton",
+        content: getTranslation("ExplorerError2")
+      });
     }
   },
-  file: function(id,value){
-    const element =  document.getElementById(id)
-    const dir = path.join(element.getAttribute('dir'),value)
-    if (!fs.existsSync(dir)){
-        fs.writeFile(dir,"",function(){
-          loadDirs(
-            element.getAttribute('dir'),
-            element.id,
-            element.getAttribute("global")
-          ,function(){
+  file: function(id, value) {
+    const element = document.getElementById(id);
+    const dir = path.join(element.getAttribute("dir"), value);
+    if (!fs.existsSync(dir)) {
+      fs.writeFile(dir, "", function() {
+        Explorer.load(
+          element.getAttribute("dir"),
+          element.id,
+          element.getAttribute("global"),
+          function() {
             //callback
-          });
-        })
-    }else{
+          }
+        );
+      });
+    } else {
       new Notification({
-        title:"Graviton",
-        content:getTranslation("ExplorerError1")
-      })
+        title: "Graviton",
+        content: getTranslation("ExplorerError1")
+      });
     }
   }
-}
+};
 
 const directories = {
-  newFolder: function(object){
+  newFolder: function(object) {
     new Dialog({
       id: "new_folder",
-      title: current_config.language["Dialog.RenameTo"],
-      content: "<div id='rename_dialog' class='section-1' contentEditable> New Folder </div>",
+      title: getTranslation("Dialog.RenameTo"),
+      content: `<input  id='rename_dialog' class='section-1 input2' placeholder="New Folder" >  </input>`,
       buttons: {
-        [current_config.language["Cancel"]]:{},
-        [current_config.language[
-          "Accept"
-        ]]: {
-          click:()=>{
-            create.folder(object,document.getElementById('rename_dialog').innerText)
+        [getTranslation("Cancel")]: {},
+        [getTranslation("Accept")]: {
+          click: () => {
+            create.folder(
+              object,
+              document.getElementById("rename_dialog").value === ""
+                ? "New folder"
+                : document.getElementById("rename_dialog").value
+            );
           },
-          important:true
+          important: true
         }
       }
     });
+    document
+      .getElementById("rename_dialog")
+      .addEventListener("keyup", function(event) {
+        if (event.keyCode === 13) {
+          event.preventDefault();
+          create.folder(object, this.value === "" ? "New folder" : this.value);
+          closeDialog("new_folder");
+        }
+      });
+    document.getElementById("rename_dialog").focus();
   },
-  newFile: function(object){
+  newFile: function(object) {
     new Dialog({
       id: "new_file",
-      title: current_config.language["Dialog.RenameTo"],
-      content: "<div id='rename_dialog' class='section-1' contentEditable> New File.txt </div>",
+      title: getTranslation("Dialog.RenameTo"),
+      content: `<input  id='rename_dialog' class='section-1 input2' placeholder="NewFile.txt" >  </input>`,
       buttons: {
-        [current_config.language["Cancel"]]: {},
-        [current_config.language[
-          "Accept"
-        ]]: {
-          click: ()=>{
-            create.file(object,document.getElementById('rename_dialog').innerText); 
+        [getTranslation("Cancel")]: {},
+        [getTranslation("Accept")]: {
+          click: () => {
+            create.file(
+              object,
+              document.getElementById("rename_dialog").value === ""
+                ? "NewFile.txt"
+                : document.getElementById("rename_dialog").value
+            );
           },
-          important:true
+          important: true
         }
       }
     });
+    document
+      .getElementById("rename_dialog")
+      .addEventListener("keyup", function(event) {
+        if (event.keyCode === 13) {
+          event.preventDefault();
+          create.file(object, this.value === "" ? "NewFile.txt" : this.value);
+          closeDialog("new_file");
+        }
+      });
+    document.getElementById("rename_dialog").focus();
   },
   removeFileDialog: function(object) {
     new Dialog({
       id: "remove_file",
-      title: current_config.language["Dialog.AreYouSure"],
+      title: getTranslation("Dialog.AreYouSure"),
       content: "",
       buttons: {
-        [current_config.language["Cancel"]]: {},
-        [current_config.language[
-          "Accept"
-        ]]:{
-          click:()=>{
+        [getTranslation("Cancel")]: {},
+        [getTranslation("Accept")]: {
+          click: () => {
             directories.removeFile(object.id);
           }
         }
@@ -870,14 +540,12 @@ const directories = {
   removeFolderDialog: function(object) {
     new Dialog({
       id: "remove_folder",
-      title: current_config.language["Dialog.AreYouSure"],
+      title: getTranslation("Dialog.AreYouSure"),
       content: "",
       buttons: {
-        [current_config.language["Cancel"]]: {},
-        [current_config.language[
-          "Accept"
-        ]]: {
-          click:()=>{
+        [getTranslation("Cancel")]: {},
+        [getTranslation("Accept")]: {
+          click: () => {
             directories.removeFolder(object.id);
           }
         }
@@ -887,368 +555,115 @@ const directories = {
   removeFile: function(id) {
     const object = document.getElementById(id);
     fs.unlink(object.getAttribute("dir"), function(err) {
-      if (err) console.error(err);
+      if (err) graviton.throwError(err);
       object.remove();
     });
   },
   removeFolder: function(id) {
     const rimraf = require("rimraf");
     const object = document.getElementById(id);
-    rimraf.sync(object.getAttribute("dir"))
+    rimraf.sync(object.getAttribute("dir"));
     object.remove();
   },
-  getCustomIcon: function(path, state) {
-    switch (path) {
-      case "node_modules":
-        return "src/icons/custom_icons/node_modules.svg";
-        break;
-      case ".git":
-        return "src/icons/custom_icons/git.svg";
-        break;
-      default:
-        if (state == "close") {
-          return "src/icons/folder_closed.svg";
-        } else {
-          return "src/icons/folder_opened.svg";
-        }
+  getCustomIcon: function(dir, state) {
+    if (
+      themeObject.icons == undefined ||
+      dir == "node_modules" ||
+      dir == ".git" ||
+      (themeObject.icons["folder_closed"] == undefined && state == "close") ||
+      (themeObject.icons["folder_opened"] == undefined && state == "open")
+    ) {
+      switch (dir) {
+        case "node_modules":
+          return "src/icons/custom_icons/node_modules.svg";
+          break;
+        case ".git":
+          return "src/icons/custom_icons/git.svg";
+          break;
+        default:
+          if (state == "close") {
+            return "src/icons/folder_closed.svg";
+          } else {
+            return "src/icons/folder_opened.svg";
+          }
+      }
+    } else {
+      switch (dir) {
+        case "node_modules":
+          return path.join(themeObject.name, themeObject.icons["node_modules"]);
+          break;
+        case ".git":
+          return path.join(themeObject.name, themeObject.icons["git"]);
+          break;
+        default:
+          if (state == "close") {
+            return path.join(
+              themeObject.name,
+              themeObject.icons["folder_closed"]
+            );
+          } else {
+            return path.join(
+              themeObject.name,
+              themeObject.icons["folder_opened"]
+            );
+          }
+      }
     }
   }
 };
 
 /*
-  * Used for loading it's icon in the explorer menu
-  * Not recognized formats will have the unknown icon as default
-*/
-
-function getFormat(text) {
-  switch (text.split(".").pop()) {
-    case "html":
-      return "html";
-    case "js":
-      return "js";
-    case "css":
-      return "css";
-    case "json":
-      return "json";
-    case "md":
-      return "md";
-    case "ts":
-      return "ts";
-    case "jpg":
-    case "png":
-    case "ico":
-    case "svg":
-      return "image";
-    default:
-      return "unknown";
-  }
-}
-
-function getLanguageName(format) {
-  switch (format) {
-    case "html":
-      return "HTML";
-    case "css":
-      return "CSS";
-    case "js":
-      return "JavaScript";
-    case "jsx":
-      return "React JavaScript";
-    case "json":
-      return "JSON ";
-    case "go":
-      return "Go";
-    case "sql":
-      return "SQL";
-    case "rb":
-    case "ruby":
-      return "Ruby";
-    case "php":
-      return "PHP";
-    case "sass":
-      return "Sass";
-    case "dart":
-      return "Dart";
-    case "pascal":
-      return "Pascal";
-    case "md":
-      return "Markdown";
-    case "py":
-      return "Python";
-    case "sh":
-      return "Shell";
-    case "c":
-      return "C";
-    case "ino":
-      return "C";
-    case "h":
-      return "C";
-    case "cpp":
-      return "C++";
-    case "c++":
-      return "C++";
-    case "cc":
-      return "C++";
-    case "cxx":
-      return "C++";
-    case "hpp":
-      return "C++";
-    case "h++":
-      return "C++";
-    case "hh":
-      return "C++";
-    case "hxx":
-      return "C++";
-    case "csharp":
-      return "C#";
-    case "cs":
-      return "C#";
-    case "java":
-      return "Java";
-    case "m":
-      return "Objective-C";
-    case "mm":
-      return "Objective-C";
-    case "kt":
-      return "Kotlin";
-    case "ts":
-      return "TypeScript";
-    case "toml":
-    case "rs":
-      return "Rust";
-    default:
-      return format;
-  }
-}
-
-function updateCodeMode(instance, path) {
-  if (g_highlighting == "activated") {
-    switch (path.split(".").pop()) {
-      case "html":
-        instance.setOption("mode", "htmlmixed");
-        instance.setOption("htmlMode", true);
-        plang = "HTML";
-        instance.refresh();
-        break;
-      case "css":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "css");
-        plang = "CSS";
-        instance.refresh();
-        break;
-      case "js":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "javascript");
-        plang = "JavaScript";
-        instance.refresh();
-        break;
-      case "jsx":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "jsx");
-        plang = "React JavaScript";
-        instance.refresh();
-        break;
-      case "json":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "application/json");
-        plang = "JSON / JavaScript";
-        instance.refresh();
-        break;
-      case "go":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "go");
-        plang = "Go";
-        instance.refresh();
-        break;
-      case "sql":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "sql");
-        plang = "SQL";
-        instance.refresh();
-        break;
-      case "rb":
-      case "ruby":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "ruby");
-        plang = "Ruby";
-        instance.refresh();
-        break;
-      case "php":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "php");
-        plang = "PHP";
-        instance.refresh();
-        break;
-      case "sass":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "sass");
-        plang = "Sass";
-        instance.refresh();
-        break;
-      case "dart":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "dart");
-        plang = "Dart";
-        instance.refresh();
-        break;
-      case "pascal":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "pascal");
-        plang = "Pascal";
-        instance.refresh();
-        break;
-      case "md":
-        instance.setOption("htmlMode", true);
-        instance.setOption("mode", "markdown");
-        plang = "Markdown";
-        instance.refresh();
-        break;
-      case "py":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "python");
-        plang = "Python";
-        instance.refresh();
-        break;
-      case "sh":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "shell");
-        plang = "Shell";
-        instance.refresh();
-        break;
-      case "c":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "text/x-csrc");
-        plang = "C";
-        instance.refresh();
-        break;
-      case "cpp":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "text/x-c++src");
-        plang = "C++";
-        instance.refresh();
-        break;
-      case "cs":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "text/x-csharp");
-        plang = "C#";
-        instance.refresh();
-        break;
-      case "java":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "text/x-java");
-        plang = "Java";
-        instance.refresh();
-        break;
-      case "h":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "text/x-objectivec");
-        plang = "Objective-C";
-        instance.refresh();
-        break;
-      case "kt":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "text/x-kotlin");
-        plang = "Kotlin";
-        instance.refresh();
-        break;
-      case "ts":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "application/typescript");
-        plang = "TypeScript";
-        instance.refresh();
-        break;
-      case "toml":
-      case "rs":
-        instance.setOption("htmlMode", false);
-        instance.setOption("mode", "rust");
-        plang = "Rust";
-        instance.refresh();
-        break;
-      default:
-        plang = "Unknown";
-        instance.refresh();
-    }
-  }
-}
+ * Used for loading it's icon in the explorer menu
+ * Not recognized formats will have the unknown icon as default
+ */
 
 const registerNewProject = function(dir) {
   // Add a new directory to the history if it is the first time it has been opened in the editor
-  fs.readFile(logDir, "utf8", function(err, data) {
-    if (err) return;
-    log = JSON.parse(data);
-    for (i = 0; i < log.length + 1; i++) {
-      if (i != log.length) {
-        if (log[i].Path == dir) {
-          return;
-        }
-      } else if (i == log.length) {
-        log.unshift({
-          Name: path.basename(dir),
-          Path: dir
-        });
-        fs.writeFile(logDir, JSON.stringify(log));
+  for (i = 0; i < log.length + 1; i++) {
+    if (i != log.length) {
+      if (log[i].Path == dir) {
         return;
       }
+    } else if (i == log.length) {
+      log.unshift({
+        Name: path.basename(dir),
+        Path: dir
+      });
+      fs.writeFile(logDir, JSON.stringify(log));
+      return;
     }
-  });
+  }
 };
 
-const HTML_template = `
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>New Project</title>
-    <meta name="description" content="Graviton Project">
-  </head>
-  <body>
-    <h1>Hello World!</h1>
-  </body>
-</html>
-`;
-const g_newProject = function(template) {
-  dialog.showOpenDialog({ properties: ["openDirectory"] }, selectedFiles => {
-    if (selectedFiles !== undefined) {
-      switch (template) {
-        case "html":
-          const g_project_dir = path.join(
-            selectedFiles[0],
-            ".GravitonProject " + Date.now()
-          );
-          fs.mkdirSync(g_project_dir);
-          fs.writeFile(
-            path.join(g_project_dir, "index.html"),
-            HTML_template,
-            err => {
-              if (err) {
-                return err;
+const createNewProject = function(template) {
+  dialog.showOpenDialog(
+    {
+      properties: ["openDirectory"]
+    },
+    selectedFiles => {
+      if (selectedFiles !== undefined) {
+        switch (template) {
+          case "html":
+            const g_project_dir = path.join(
+              selectedFiles[0],
+              ".GravitonProject " + Date.now()
+            );
+            fs.mkdirSync(g_project_dir);
+            fs.writeFile(
+              path.join(g_project_dir, "index.html"),
+              graviton.getTemplate("html_project"),
+              err => {
+                if (err) {
+                  return err;
+                }
+                Explorer.load(g_project_dir, "g_directories", true);
               }
-              loadDirs(g_project_dir, "g_directories", true);
-            }
-          );
-          break;
+            );
+            break;
+        }
       }
     }
-  });
-};
-const g_NewProjects = () => {
-  const new_projects_window = new Window({
-    id: "new_projects_window",
-    content: `
-      <h2 class="window_title">${current_config.language["Templates"]}</h2> 
-      <div onclick="g_newProject('html'); closeWindow('new_projects_window');" class="section-2">
-        <p>HTML</p>
-      </div>`
-  });
-  new_projects_window.launch();
-};
-const preload = array => {
-  // Preload images when booting
-  for (i = 0; i < array.length; i++) {
-    document.body.innerHTML += `
-    <img id="${array[i]}"src="${array[i]}" style="visibility:hidden;"></img>`;
-    document.getElementById(array[i]).remove();
-  }
+  );
 };
 const touchingResizer = type => {
   if (type == false) {
@@ -1259,123 +674,165 @@ const touchingResizer = type => {
     touchingResizerValue = true;
   }
 };
-const touchingMiniMap = type => {
-  if (type == false) {
-    if (!mouseClicked) {
-      touchingMiniMapScroller = false;
-    }
-  } else {
-    touchingMiniMapScroller = true;
-  }
-};
 
-function look(text){
-  let _variables =[];
-  for(i=0;i<text.length;i++){
-    switch(editor.getMode().name){
+function checkVariables(text) {
+  let _variables = [];
+  for (i = 0; i < text.length; i++) {
+    switch (editor.getMode().name) {
       case "javascript":
-        switch (text[i]){
+        switch (text[i]) {
           case "let":
           case "var":
           case "const":
             _variables.push({
-              _name: text[i+1]
+              _name: text[i + 1]
             });
-          break;        
+            break;
         }
-      break;
+        break;
       case "java":
-        switch (text[i]){
+        switch (text[i]) {
           case "int":
           case "char":
           case "float":
             _variables.push({
-              _name: text[i+1]
+              _name: text[i + 1]
             });
-          break;        
+            break;
         }
-      break;
+        break;
     }
   }
   return _variables;
 }
 
-class elasticContainerComponent extends HTMLElement {
-  constructor() {
-    super();
+const installCli = function() {
+  const npm = require("npm");
+  npm.load(
+    {
+      global: true
+    },
+    function(er) {
+      if (er) return er;
+      npm.commands.install(["graviton-cli"], function(er, data) {
+        if (er) return er;
+        console.log("Graviton CLI has been installed!");
+      });
+    }
+  );
+};
+
+window.onclick = function(event) {
+  if (
+    !(event.target.matches(".dropbtn") || event.target.matches(".icon_border"))
+  ) {
+    graviton.closeDropmenus();
   }
-  connectedCallback() {
-    const container = this;
-    container.id = "elastic"+Math.random()
-    const related = (function(){
-      if(container.getAttribute("related")=="parent" || container.getAttribute("related") == undefined ){
-        return container.parentElement;
-      }
-      if(container.getAttribute("related")=="child"){
-        return  container.children[0];
-      }
-      if(container.getAttribute("related")=="self"){
-        return  container;
-      }
-    })()
-    const el = this.parentElement;
-    el.onscroll = function() {
-      if(Number(el.getAttribute("toleft"))!=el.scrollLeft) return;
-      el.setAttribute("toleft",el.scrollLeft)
-      if(current_config.bouncePreferences == "desactivated") return;
-      if( related == null || related == undefined) {
+  if (!event.target.matches(".option")) {
+    document.getElementById("context").parentElement.style = "display:none";
+  }
+  if (!event.target.matches("#context_menu")) {
+    if (document.getElementById("context_menu") != undefined) {
+      document.getElementById("context_menu").remove();
+    }
+  }
+};
+graviton.refreshCustomization = () => {
+  document.documentElement.style.setProperty(
+    "--editor-font-size",
+    `${current_config.fontSizeEditor}px`
+  ); // Update settings from start
+  webFrame.setZoomFactor(current_config.appZoom / 25);
+  if (current_config.blurPreferences != 0) {
+    document.documentElement.style.setProperty(
+      "--blur",
+      `${current_config.blurPreferences}px`
+    );
+  } else {
+    document.documentElement.style.setProperty("--blur", `none`);
+  }
+};
+
+function selectLang(lang) {
+  const languages_divs = document.getElementsByClassName("language_div");
+  for (i = 0; i < languages_divs.length; i++) {
+    languages_divs[i].classList.remove("active");
+  }
+  lang.classList.add("active");
+}
+
+function selectTheme(from, theme) {
+  let themes_divs;
+  switch (from) {
+    case "1":
+      themes_divs = document.getElementsByClassName("theme_div");
+      break;
+    case "2":
+      themes_divs = document.getElementsByClassName("theme_div2");
+      break;
+  }
+  for (i = 0; i < themes_divs.length; i++) {
+    themes_divs[i].classList.remove("active");
+  }
+  theme.classList.add("active");
+}
+/*
+
+  Language  indicator and Line/Char counter Controls
+
+*/
+document.addEventListener("screen_loaded",(e)=>{
+  const screen = e.detail.screen;
+    function refreshStats(id = current_screen.id){
+      if(id!=screen) return;
+      langController.setText(graviton.getLanguage());
+      langController.setHint(`Current: ${graviton.getLanguage()}`);
+      if(editor==undefined) {
+        counter.hide()
         return;
       }
-      if(related.id!=undefined){
-        if(document.getElementById(related.id)==undefined){
-          return;
-        }
-      }  
-      if (el.scrollTop == 0) {
-        const spacer = document.createElement("div")
-        spacer.classList.add("bounce_top")
-        this.insertBefore(spacer, this.children[0])
-        setTimeout(function() {
-          spacer.remove()
-        }, 360)      
-      }
-      if (el.scrollHeight-1 <= el.scrollTop+el.clientHeight) {
-        if(document.getElementsByClassName("bounce_bottom").length!=0 || related == null) return;
-        const spacer = document.createElement("div")
-        spacer.classList.add("bounce_bottom")
-        this.appendChild(spacer)
-        setTimeout(function() {
-          spacer.remove()
-        }, 360)      
-      }
-    } 
-  }
-}
-window.customElements.define("elastic-container", elasticContainerComponent);
+      counter.show()
+      counter.setText(editor.getCursor().line + 1 + '/' + Number(editor.getCursor().ch + 1))
+      counter.setHint(`Line ${editor.getCursor().line + 1 } , Char ${ Number(editor.getCursor().ch + 1)}`)
+      editor.on("cursorActivity", function(a) {
+        counter.setText(editor.getCursor().line + 1 + '/' + Number(editor.getCursor().ch + 1))
+        counter.setHint(`Line ${editor.getCursor().line + 1 } , Char ${ Number(editor.getCursor().ch + 1)}`)
+        counter.show()
+      });
+    }
+    let langController = new Control({
+      text : graviton.getLanguage(),
+      hint:`Current: ${graviton.getLanguage()}`
+    });
+    if(editor!=undefined){
+      var counter = new Control({
+        text : editor.getCursor().line + 1 + '/' + Number(editor.getCursor().ch + 1),
+        hint : `Line ${editor.getCursor().line + 1 } , Char ${ Number(editor.getCursor().ch + 1)}`
+      });
+      refreshStats()
+    }else{
+      var counter = new Control({
+        text : "",
+      });
+      counter.hide()
+      refreshStats()
+    }
+    document.addEventListener("tab_loaded",(e)=>{
+      refreshStats(e.detail.screen)
+    })
+    document.addEventListener("tab_created",()=>{
+      refreshStats()
+    })
+})
 
-const elasticContainer ={
-  append: function(el){
-    el.onscroll = function() {
-      if(Number(el.getAttribute("toleft"))!=el.scrollLeft) return;
-      el.setAttribute("toleft",el.scrollLeft)
-      if(current_config.bouncePreferences == "desactivated") return;
-      if (el.scrollTop >= 0 && el.scrollTop < 1) {
-        const spacer = document.createElement("div")
-        spacer.classList.add("bounce_top")
-        this.insertBefore(spacer, this.children[0])
-        setTimeout(function() {
-          spacer.remove()
-        }, 360)      
-      }
-      if (el.scrollHeight-1 <= el.scrollTop+el.clientHeight) {
-        if(document.getElementsByClassName("bounce_bottom").length!=0) return;
-        const spacer = document.createElement("div")
-        spacer.classList.add("bounce_bottom")
-        this.appendChild(spacer)
-        setTimeout(function() {
-          spacer.remove()
-        }, 360)      
-      }
-    } 
-  }
-}
+/*
+
+
+const stand = require("standard")
+stand.lintText(editor.getValue(),{
+  fix:false
+},(aa)=>{
+  console.log(aa)
+})
+
+*/

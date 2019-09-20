@@ -1,31 +1,28 @@
 {
   "name": "Graviton",
-  "version": "1.0.3",
+  "version": "1.2.0",
   "description": "Graviton is a simple code editor.",
   "main": "main.js",
   "repository": "https://github.com/Graviton-Code-Editor/Graviton-App",
   "scripts": {
-    "start": "electron . GravitonEditor ",
+    "start": "electron . Graviton ",
+    "start:no.sandbox": "electron . Graviton --no-sandbox",
     "pack": "build --dir",
     "build": "build",
     "build:snap": "build --linux snap",
-    "build:win": "build --win x64",
+    "build:win": "build --win",
     "build:win32": "build --win --ia32",
-    "build:win:linux": "build --linux && build --win && build --win --ia32",
-    "rebuild": "electron-rebuild -f -w node-pty && electron-rebuild -f -w nodegit",
-    "standard": "standard --fix"
+    "build:win:linux": "build --linux && build --win ",
+    "rebuild": "electron-rebuild -f -w node-pty",
+    "standard": "standard --fix",
+    "test": "mocha test"
   },
   "standard": {
     "ignore": [
       "/node_modules",
       "/build",
       "/dist",
-      "/languages",
-      "/plugins",
-      "/themes",
-      "/src/lib",
-      "/src/mode",
-      "/src/addons"
+      "/languages"
     ]
   },
   "keywords": [
@@ -39,27 +36,32 @@
   "license": "MIT",
   "dependencies": {
     "appdata-path": "^1.0.0",
+    "codemirror": "^5.48.2",
+    "degit": "^2.1.4",
     "fs-extra": "^7.0.1",
     "marked": "^0.7.0",
-    "node-pty": "^0.9.0-beta21",
-    "nodegit": "^0.24.3",
+    "mousetrap": "^1.6.3",
+    "node-pty": "^0.9.0-beta24",
     "npm": "^6.10.1",
     "octonode": "^0.9.5",
     "request": "^2.88.0",
     "rimraf": "^2.6.3",
+    "semver": "^6.3.0",
     "tinycolor2": "^1.4.1",
     "xterm": "^3.14.5"
   },
   "devDependencies": {
-    "electron": "^5.0.0",
+    "electron": "^6.0.0",
     "electron-builder": "^20.44.4",
     "electron-rebuild": "^1.8.5",
+    "mocha": "^6.2.0",
+    "spectron": "^7.0.0",
     "standard": "^12.0.1"
   },
   "build": {
     "appId": "graviton-editor",
     "artifactName": "${name}-${version}-${arch}-${platform}.${ext}",
-    "icon": "build/mac/icon.png",
+    "icon": "assets/mac/icon.png",
     "asar": true,
     "dmg": {
       "contents": [
@@ -78,11 +80,11 @@
         "deb",
         "rpm"
       ],
-      "icon": "build/linux"
+      "icon": "assets/linux"
     },
     "win": {
       "target": "NSIS",
-      "icon": "build/win/icon.ico"
+      "icon": "assets/win/icon.ico"
     }
   }
 }

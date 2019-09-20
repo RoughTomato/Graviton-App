@@ -2,7 +2,7 @@
 ########################################
               MIT License
 
-Copyright (c) 2019 Marc Espín Sanz
+Copyright (c) 2019 Marc Espin Sanz
 
 License > https://github.com/Graviton-Code-Editor/Graviton-App/blob/master/LICENSE.md
 
@@ -11,8 +11,7 @@ License > https://github.com/Graviton-Code-Editor/Graviton-App/blob/master/LICEN
 
 const url = require("url")
 const path = require("path")
-const fs = require("fs")
-const { app, BrowserWindow, globalShortcut, BrowserView } = require("electron")
+const { app, BrowserWindow } = require("electron")
 let main // Main window
 
 app.on("ready", function() {
@@ -27,7 +26,7 @@ app.on("ready", function() {
     height: 650,
     minHeight: 310,
     minWidth: 310,
-    backgroundColor: "#222222",
+    backgroundColor: "#191919",
     title: "Graviton Editor"
   })
   main.loadURL(
@@ -38,18 +37,18 @@ app.on("ready", function() {
     })
   )
   main.setMenuBarVisibility(
-    true
-  ) 
-  main.setMenuBarVisibility(
-    path.basename(__dirname) === ("Graviton-Editor" || "Graviton-App")
+    path.basename(__dirname) === "Graviton-Editor" ||
+      path.basename(__dirname) === "Graviton-App"
   ) // True = when it's not on production
-
 })
 app.on("window-all-closed", () => {
   app.quit()
 })
 app.on("before-quit", () => {
   app.removeAllListeners("close")
-  app.close()
 })
 app.commandLine.appendSwitch("disable-smooth-scrolling", "true")
+
+
+
+

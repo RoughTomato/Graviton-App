@@ -1,43 +1,48 @@
 # Graviton Editor
-[![Build Status](https://travis-ci.org/Graviton-Code-Editor/Graviton-App.svg?branch=master)](https://travis-ci.org/Graviton-Code-Editor/Graviton-App)
+
+[![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2FGraviton-Code-Editor%2FGraviton-App%2Fbadge%3Fref%3Dmaster&style=flat)](https://actions-badge.atrox.dev/Graviton-Code-Editor/Graviton-App/goto?ref=master)
 [![HitCount](http://hits.dwyl.io/https://github.com/marc2332/https://github.com/Graviton-Code-Editor/Graviton-App.svg)](http://hits.dwyl.io/https://github.com/marc2332/https://github.com/Graviton-Code-Editor/Graviton-App)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Graviton-Code-Editor/Graviton-App/blob/master/LICENSE.md)
 ![GitHub All Releases](https://img.shields.io/github/downloads/Graviton-Code-Editor/Graviton-App/total.svg?style=plastic)
+![Commits](https://img.shields.io/github/commit-activity/m/Graviton-Code-Editor/Graviton-App)
 ![GitHub package.json version](https://img.shields.io/github/package-json/v/Graviton-Code-Editor/Graviton-App.svg)
 [![GitHub contributors](https://img.shields.io/github/contributors/Graviton-Code-Editor/Graviton-App.svg)](https://GitHub.com/Graviton-Code-Editor/Graviton-App/graphs/contributors/)
 [![Open Source Love svg3](https://badges.frapsoft.com/os/v3/open-source.svg?v=103)](https://github.com/Graviton-Code-Editor/Graviton-App/)
-
-[![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/graviton)
+[![Discord Server](https://discordapp.com/api/guilds/536130219057086514/widget.png)](https://discord.gg/gg6CTYA)
 
 ![example screenshot](example.png)
 
+Changes on this source may not be released as an official build yet.
 
-Graviton is a cross-platform editor with a minimalist looking. Somethings about it:
-
-- Themes
-- Plugins
-- Splitted screens
-- Built-in terminal
-- Tons of supported programming languages
-- Zen mode
-- An integrated plugins & themes market
-
-**[Changelog](CHANGELOG.md)**
-
-Social media:
+✨ Highlights:
 ---
 
-Telegram channel: https://t.me/gravitoneditor
+* 💅 Minimal UI
+* 🎨 Themes 
+* 📦 Plugins 
+* 🖇  Infinite splitted screens 
+* 🕹  Built-in terminal 
+* 🗺 Built-in image previewer
+* 📰 Built-in font previewer
+* 🏭 A Plugin and Themes Market 
+* 😇 More respectful of RAM than many alternatives 
+* ✔  Tons of supported programming languages 
+* 📝 Multi line editing 
+* 🎧 Zen mode 
 
-Discord server: https://discord.gg/gg6CTYA
+**[Commit Changelog](CHANGELOG.md)**
 
-Twitter: https://twitter.com/gravitoneditor
-
-
-Contributing (working on) ⚙
+📣 Social media:
 ---
 
-**[Documentatiom](https://github.com/Graviton-Code-Editor/Graviton-App/wiki)**
+* [Telegram Channel](https://t.me/gravitoneditor)
+* [Discord Server](https://discord.gg/gg6CTYA)
+* [Twitter](https://twitter.com/gravitoneditor)
+
+⚙ Contributing (working on) 
+---
+
+**[Documentation](https://github.com/Graviton-Code-Editor/Graviton-App/wiki)**
 
 **[Code of conduct](CODE_OF_CONDUCT.md)**
 
@@ -53,35 +58,46 @@ Some ways to contribute to Graviton's project:
 For people who translates to a new language:
 Please consider revising and updating your languages in case they are missing some new strings.
 
-Thank you all!
+👽 Authors 
+---
 
-Donating 🎁
+#### Main Developer:
+* Marc Espín [Github](https://github.com/marc2332)
+
+#### Main Contributors:
+* Max1Truc [Github](https://github.com/Max1Truc)
+* David Niederweis [Github](https://github.com/DJN1)
+
+#### Credits:
+* Miguel Ranger for first autocomplete version
+* Old logo by Saúl Blanco
+* Advices from León Alvarez
+
+
+🤩 Useful libraries 
+---
+* [CodeMirror](https://codemirror.net/)
+* [OpenEmoji](https://openmoji.org)
+
+🎁 Donating 
 ---
 
 - BTC address: 1HCBeYD564Y3AjQ3Ci6Fp2zosfZvevJuu6
 - Paypal: https://www.paypal.me/mkenzo8
 
-Donators 🐱‍🏍
----
-- 2€ donation by Alex Mayol
-- BTCs donation by [Machou](http://GitHub.com/Machou)
-- 2€ donation by Cristina Piva
+### Donators:
+- Rôdeuse 
+- Alex Mayol
+- [Machou](http://GitHub.com/Machou)
+- Cristina Piva
+
 
 Thank you for the donations!
 
-Credits ✨
----
-- [Codemirror](codemirror.net)
-- Help in autocompletation , Miguel Rangel
-- Old logo by Saúl Blanco 
-- [MiniMap Original source](https://github.com/alterfan/minimap)
-- [OpenEmoji](https://openmoji.org/)
+And all people who helped me :)
 
- And all people who helped me :)
-
-Available platforms 💻🖥
+💻🖥 Available platforms 
 ---
-It's available on:
 
 **Windows**
 
@@ -89,7 +105,6 @@ It's available on:
 
 **Linux**
 
-   * `Snapcraft` 
    * `Appimage (.appimage)`
    * `Debian  (.deb)`
    * `CentOS (.rpm)`
@@ -100,21 +115,22 @@ It's available on:
 
 The current state is beta, check the releases page to download the latest version. 
 
-Building 🧱
+🧱Building 
 ---
-Wanna build Graviton from source?
+Do you want to build Graviton from source?
 
 **Check [this](BUILDING.md)**
 
-Known problems 😓
+😓 Known problems 
 ---
-- Updating to a new Graviton might throw error because I have added breaking changes. Clicking on the "Repair" button should fix it.
+- May not open on some Linux systems
+- Terminal might not work very well (Windows)
 
-License 🧾
+🧾License 
 ---
 MIT License
 
-Copyright (c) Marc Espín Sanz
+Copyright (c) Marc Espin Sanz
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -1,37 +1,21 @@
-## Important
+## 🔝 Important
 
-- Added a Plugins market!
-- You can now reorganize the tabs by dragging and dropping
-- Created a CLI (optional)
-- You can now create folders and files & remove them from the editor
-- Added a MiniMap (optional)
+* Market redesign
+* Reduced installer weight and installation x5 times
 
-## New
+## ✔ New
 
-- Added a bounce effect to some part of the app (can be disabled)
-- Auto completator also detects the defined variables and it shows you them (JavaScript)
-- You can hide the terminal by pressing Ctrl+H
-- Custom themes, you can create themes with CSS code 
-- Rust support (.rs & .toml files)
-- Now, you can reload a directory by right clicking, this also works for the global one
-- There are now only 2 themes by default, you can install more from the market
-- Changed the closing terminal to Ctrl + U
-- Added "Fullscreen" button in the menu Window
-- Added a current directory title on top
-- Toggle the menus visibility by pressing Ctrl + Tab
+* Readded the New Project page
+* Implemented a loading bar in Market
+* Plugins can now show screenshoots in Market
+* Improved creating files and folders dialogs
 
-## Bug fixes
+## 😁 Bug fixes
 
-- Ruby highlighter wasn't working
-- Cannot close any terminal
-- Markdown highlighter wasn't working
+* Plugin update detector
+* Couldn't force to close an unsaved tab
 
+## 🤓 Developers
 
-
-
-
-
-
-
-
-
+* Updated Electron to v6
+* New Graviton component called Control 

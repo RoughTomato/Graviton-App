@@ -2,612 +2,644 @@
 ########################################
               MIT License
 
-Copyright (c) 2019 Marc Espín Sanz
+Copyright (c) 2019 Marc Espin Sanz
 
 License > https://github.com/Graviton-Code-Editor/Graviton-App/blob/master/LICENSE.md
 
 #########################################
 */
-"use strict"
+'use strict'
 
-const _os = require("os");
-const pty = require("node-pty");
-const path = require("path");
-const { Dialog, closeDialog } = require(path.join(
-    __dirname,
-    "src",
-    "javascript",
-    "controls",
-    "dialogs.js"
-  )),
-  { Window, closeWindow } = require(path.join(
-    __dirname,
-    "src",
-    "javascript",
-    "controls",
-    "windows.js"
-  )),
-  { Notification, closeNotification } = require(path.join(
-    __dirname,
-    "src",
-    "javascript",
-    "controls",
-    "notifications.js"
-  )),
-  { Tab, closeTab, loadTab } = require(path.join(
-    __dirname,
-    "src",
-    "javascript",
-    "controls",
-    "tabs.js"
-  ));
+const _os = require('os')
+const pty = require('node-pty')
+const path = require('path')
+let graviton = {}
+const {
+  Dialog,
+  closeDialog
+} = require(path.join(
+  __dirname,
+  'src',
+  'javascript',
+  'api',
+  'components',
+  'dialogs.js'
+)); const {
+  Window,
+  closeWindow
+} = require(path.join(
+  __dirname,
+  'src',
+  'javascript',
+  'api',
+  'components',
+  'windows.js'
+)); const {
+  Notification,
+  closeNotification
+} = require(path.join(
+  __dirname,
+  'src',
+  'javascript',
+  'api',
+  'components',
+  'notifications.js'
+)); const {
+  Tab,
+  closeTab,
+  loadTab
+} = require(path.join(
+  __dirname,
+  'src',
+  'javascript',
+  'api',
+  'components',
+  'tabs.js'
+))
 
 const dropMenu = require(path.join(
   __dirname,
-  "src",
-  "javascript",
-  "controls",
-  "dropmenus.js"
-)).Dropmenu;
-let { icons } = require(path.join(
+  'src',
+  'javascript',
+  'api',
+  'components',
+  'dropmenus.js'
+)).Dropmenu
+let {
+  icons
+} = require(path.join(
   __dirname,
-  "src",
-  "javascript",
-  "controls",
-  "icons.js"
-));
+  'src',
+  'javascript',
+  'api',
+  'components',
+  'icons.js'
+))
 
-let menus_showing = true;
+const { commander, commanders } = require(path.join(
+  __dirname,
+  'src',
+  'javascript',
+  'api',
+  'components',
+  'commanders.js'
+))
+
+let menus_showing = true
 let context_menu_list_text = {
-  //Initial value
+  // Initial value
   Copy: () => {
-    document.execCommand("copy");
+    document.execCommand('copy')
   },
   Paste: () => {
-    document.execCommand("paste");
+    document.execCommand('paste')
   }
-};
+}
+
 const context_menu_list_tabs = {
-  Close: function() {
+  Close: function () {
     closeTab(
-      document.getElementById(this.getAttribute("target")).getAttribute("TabID")
-    );
+      document.getElementById(this.getAttribute('target')).getAttribute('TabID')
+    )
   }
-};
-const context_menu_list_directories = {
-  Remove: function() {
+}
+const context_menu_list_file = {
+  Remove: function () {
     directories.removeFileDialog(
       document.getElementById(
         document
-          .getElementById(this.getAttribute("target"))
-          .getAttribute("parent")
+          .getElementById(this.getAttribute('target'))
+          .getAttribute('parent')
       )
-    );
+    )
   },
-  "a1":"*line",
-  CopyPath:function(){
-    copyText(document.getElementById(this.getAttribute("target")).getAttribute("dir").replace(/\\\\/g, "\\"))
-  },
-  
-};
+  'a1': '*line',
+  CopyPath: function () {
+    graviton.copyText(document.getElementById(this.getAttribute('target')).getAttribute('dir').replace(/\\\\/g, '\\'))
+  }
+
+}
 const context_menu_directory_options = {
-  Reload: function() {
-    loadDirs(
-      document.getElementById(this.getAttribute("target")).getAttribute("dir"),
+  Reload: function () {
+    Explorer.load(
+      document.getElementById(this.getAttribute('target')).getAttribute('dir'),
       document
-        .getElementById(this.getAttribute("target"))
-        .getAttribute("parent"),
+        .getElementById(this.getAttribute('target'))
+        .getAttribute('parent'),
       document
-        .getElementById(this.getAttribute("target"))
-        .getAttribute("global")
-    );
+        .getElementById(this.getAttribute('target'))
+        .getAttribute('global')
+    )
   },
-  OpenInExplorer:function(){
-    shell.openItem(document.getElementById(document.getElementById(this.getAttribute("target")).getAttribute("parent")).getAttribute('dir'))
+  OpenInExplorer: function () {
+    shell.openItem(document.getElementById(document.getElementById(this.getAttribute('target')).getAttribute('parent')).getAttribute('dir'))
   },
-  "a1":"*line",
-  NewFolder:function(){
-    directories.newFolder(document.getElementById(this.getAttribute("target")).getAttribute("parent"));
+  OpenAsGlobal: function () {
+    Explorer.load(
+      document.getElementById(this.getAttribute('target')).getAttribute('dir').replace(/\\\\/g, '\\'),
+      'g_directories',
+      true
+    )
   },
-  NewFile:function(){
-    directories.newFile(document.getElementById(this.getAttribute("target")).getAttribute("parent"));
+  'a1': '*line',
+  NewFolder: function () {
+    directories.newFolder(document.getElementById(this.getAttribute('target')).getAttribute('parent'))
   },
-  "a2":"*line",
-  CopyPath:function(){
-    copyText(document.getElementById(this.getAttribute("target")).getAttribute("dir").replace(/\\\\/g, "\\"))
+  NewFile: function () {
+    directories.newFile(document.getElementById(this.getAttribute('target')).getAttribute('parent'))
   },
-  "a3":"*line",
-  Remove: function() {
+  'a2': '*line',
+  CopyPath: function () {
+    graviton.copyText(document.getElementById(this.getAttribute('target')).getAttribute('dir').replace(/\\\\/g, '\\'))
+  },
+  'a3': '*line',
+  Remove: function () {
     directories.removeFolderDialog(
       document.getElementById(
         document
-          .getElementById(this.getAttribute("target"))
-          .getAttribute("parent")
+          .getElementById(this.getAttribute('target'))
+          .getAttribute('parent')
       )
-    );
+    )
   }
-};
+}
 class Plugin {
-  constructor(object) {
+  constructor (object) {
     for (i = 0; i < plugins_list.length; i++) {
       if (plugins_list[i].name == object.name) {
-        //List package information
-        this.name = plugins_list[i].name;
-        this.author = plugins_list[i].author;
-        this.version = plugins_list[i].version;
-        this.description = plugins_list[i].description;
+        // List package information
+        this.name = plugins_list[i].name
+        this.author = plugins_list[i].author
+        this.version = plugins_list[i].version
+        this.description = plugins_list[i].description
       }
     }
     if (this.name == undefined) {
-      console.warn(` Plugin by name > ${object.name} < doesn't exist `);
-      return;
+      console.warn(` Plugin by name > ${object.name} < doesn't exist `)
     }
   }
-  saveData(data, callback) {
-    plugins_dbs[this.b].db = data;
+  saveData (data, callback) {
+    plugins_dbs[this.index].db = data
     fs.writeFileSync(
-      path.join(plugins_db, this.name) + ".json",
+      path.join(plugins_db, this.name) + '.json',
       JSON.stringify(data),
-      function(err) {}
-    );
-    if (!callback == undefined) return callback;
+      function (err) {}
+    )
+    if (!callback == undefined) return callback
   }
-  setData(key, data) {
-    const name = this.name;
-    if (fs.existsSync(path.join(plugins_db, name) + ".json")) {
-      this.getData(function(object){
-        object[key] = data;
+  setData (key, data) {
+    const name = this.name
+    if (fs.existsSync(path.join(plugins_db, name) + '.json')) {
+      this.getData(function (object) {
+        object[key] = data
         fs.writeFileSync(
-          path.join(plugins_db, name) + ".json",
+          path.join(plugins_db, name) + '.json',
           JSON.stringify(object),
-          function(err) {
-            plugins_dbs[this.b].db = object;
+          function (err) {
+            plugins_dbs[this.index].db = object
           }
-        );
+        )
       })
-     
     }
   }
-  createData(data) {
-    if (!fs.existsSync(path.join(plugins_db, this.name) + ".json")) {
+  createData (data) {
+    if (!fs.existsSync(path.join(plugins_db, this.name) + '.json')) {
       const db = {
         plugin_name: this.name,
         db: data
-      };
-      plugins_dbs.push(db);
-      this.b = plugins_dbs.length - 1;
+      }
+      plugins_dbs.push(db)
+      this.index = plugins_dbs.length - 1
       fs.writeFileSync(
-        path.join(plugins_db, this.name) + ".json",
+        path.join(plugins_db, this.name) + '.json',
         JSON.stringify(data),
-        function(err) {}
-      );
-      return "created";
+        function (err) {}
+      )
+      return 'created'
     } else {
-      return "already_exists";
+      return 'already_exists'
     }
   }
-  getData(callback) {
-    const me = this;
-    if(plugins_dbs[this.b]==undefined){
+  getData (callback) {
+    const me = this
+    if (plugins_dbs[this.index] == undefined) {
       const name = this.name
-      fs.readFile(path.join(plugins_db,name+".json"), "utf8", function(
+      fs.readFile(path.join(plugins_db, name + '.json'), 'utf8', function (
         err,
         data
       ) {
         const object = {
-          plugin_name: path.basename(name, ".json"),
+          plugin_name: path.basename(name, '.json'),
           db: JSON.parse(data)
         }
-        plugins_dbs.push(object);
+        plugins_dbs.push(object)
         for (i = 0; i < plugins_dbs.length; i++) {
           if (plugins_dbs[i].plugin_name == name) {
-            //List package information
-            me.b = i;
+            // List package information
+            me.index = i
           }
         }
-        return typeof callback == "function"?callback(plugins_dbs[me.b].db):plugins_dbs[me.b].db
-      });
-    }else{
-      return typeof callback == "function"?callback(plugins_dbs[me.b].db):plugins_dbs[this.b].db
+        return typeof callback === 'function' ? callback(plugins_dbs[me.index].db) : plugins_dbs[me.index].db
+      })
+    } else {
+      return typeof callback === 'function' ? callback(plugins_dbs[me.index].db) : plugins_dbs[this.index].db
     }
   }
-  deleteData(data) {
-    switch (data) {
-      case undefined:
-        plugins_dbs[b].db = {};
-        fs.writeFileSync(
-          path.join(plugins_db, this.name) + ".json",
-          "{}",
-          function(err) {}
-        );
-        break;
-      default:
-        const object = this.getData();
-        delete object[data];
-        fs.writeFileSync(
-          path.join(plugins_db, this.name) + ".json",
-          JSON.stringify(object),
-          function(err) {}
-        );
-        plugins_dbs[b].db = object;
+  deleteData (data) {
+    if (data == undefined) {
+      plugins_dbs[this.index].db = {}
+      fs.writeFileSync(
+        path.join(plugins_db, this.name) + '.json',
+        '{}',
+        function (err) {}
+      )
+    } else {
+      const object = this.getData()
+      delete object[data]
+      fs.writeFileSync(
+        path.join(plugins_db, this.name) + '.json',
+        JSON.stringify(object),
+        function (err) {}
+      )
+      plugins_dbs[this.index].db = object
     }
   }
 }
 
-
-
-function sleeping(ms) {
+function sleeping (milliseconds) {
   return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
+    setTimeout(resolve, milliseconds)
+  })
 }
 
-const graviton = {
-  getCurrentTheme: function() {
-    //Get the theme name of the applied theme
-    return current_config.theme;
+graviton = {
+  getCurrentTheme: function () {
+    // Get the theme name of the applied theme
+    return themeObject.name
   },
-  getSelectedText: function() {
-    //Get te text you have selected
-    const selected_text = window.getSelection().toString();
-    if (selected_text !== "") {
-      return selected_text;
-    } else return null; //Returns null if there is not text selected
+  getSelectedText: function () {
+    // Get te text you have selected
+    const selected_text = window.getSelection().toString()
+    if (selected_text !== '') {
+      return selected_text
+    } else return null // Returns null if there is not text selected
   },
-  setThemeByName: function(name) {
-    //Set a theme by it's name
-    return setThemeByName(name);
-  },
-  getCurrentFile: function() {
-    const _file = {
+  getCurrentFile: function () {
+    return {
       path: filepath
-    };
-    return _file;
-  },
-  getCurrentEditor: function() {
-    for (i = 0; i < editors.length; i++) {
-      //Returns the current selected editor
-      if (editorID == editors[i].id) {
-        return editors[i];
-      }
     }
-    if (editors.length == 0) return null;
   },
-  getCurrentDirectory: function() {
-    if (dir_path == undefined) return null;
-    return dir_path;
+  getCurrentEditor: function () {
+    if (editors.length == 0) return null
+    return editors.find((item) => item.id === editorID)
   },
-  currentOS: function() {
+  getCurrentDirectory: function () {
+    if (dir_path == undefined) return null
+    return dir_path
+  },
+  currentOS: function () {
     switch (process.platform) {
-      case "win32":
+      case 'win32':
         return {
           codename: process.platform,
-          name: "Windows"
-        };
-        break;
-      case "darwin":
+          name: 'Windows'
+        }
+        break
+      case 'darwin':
         return {
           codename: process.platform,
-          name: "MacOS"
-        };
-        break;
-      case "linux":
+          name: 'MacOS'
+        }
+        break
+      case 'linux':
         return {
           codename: process.platform,
-          name: "Linux"
-        };
-        break;
+          name: 'Linux'
+        }
+        break
       default:
         return {
           codename: process.platform,
           name: process.platform
-        };
+        }
     }
-    return;
   },
-  openDevTools: function() {
-    require("electron")
-      .remote.getCurrentWindow()
-      .toggleDevTools();
+  openDevTools: function () {
+    remote.getCurrentWindow().toggleDevTools()
   },
-  editorMode: function() {
-    return editor_mode;
+  editorMode: function () {
+    return editor_mode
   },
-  throwError: function(message) {
-    console.log('%c Graviton ERROR :: ', ' color: red',message);
+  throwError: function (message) {
+    console.log('%c Graviton ERROR :: ', ' color: red', message)
     new Notification({
-      title:"Error ",
+      title: 'Error ',
       content: message
-    });
+    })
   },
-  dialogAbout: function() {
+  dialogAbout: function () {
     new Dialog({
-      id: "about",
-      title: current_config.language["About"],
+      id: 'about',
+      title: getTranslation('About') + ' Graviton',
       content: `
-	      ${current_config.language["Version"]}: ${g_version.version} (${
-        g_version.date
-      }) - ${g_version.state}
-	      <br> ${current_config.language["OS"]}: ${graviton.currentOS().name}`,
+	      ${getTranslation('Version')}: ${GravitonInfo.version} (${
+  GravitonInfo.date
+}) - ${GravitonInfo.state}
+	      <br> ${getTranslation('OS')}: ${graviton.currentOS().name}`,
       buttons: {
-        [current_config.language["More"]]: {
-          click: ()=>{
-            Settings.open(); Settings.navigate('5')
+        [getTranslation('More')]: {
+          click: () => {
+            Settings.open()
+            Settings.navigate('about')
           },
           important: true
         },
-        [current_config.language["Close"]]: {}
+        [getTranslation('Close')]: {}
       }
-    });
+    })
   },
-  dialogChangelog: function() {
-    fs.readFile(path.join(__dirname, "RELEASE_CHANGELOG.md"), "utf8", function(
+  dialogChangelog: function () {
+    fs.readFile(path.join(__dirname, 'RELEASE_CHANGELOG.md'), 'utf8', function (
       err,
       data
     ) {
       new Dialog({
-        id: "changelog",
-        title: `${current_config.language["Changelog"]} - ${g_version.version}`,
+        id: 'changelog',
+        title: `${getTranslation('Changelog')} - v${GravitonInfo.version}`,
         content: `<div style="padding:2px;">${marked(data)}</div>`,
         buttons: {
-          [current_config.language["Close"]]: {}
+          [getTranslation('Close')]: {}
         }
-      });
-    });
+      })
+    })
   },
-  removeScreen: function() {
-    let content_editors = "";
-    for (i = 0; i < editor_screens.length; i++) {
-      content_editors += `
- 			<div onclick="if(screens.remove('${
-        editor_screens[i].id
-      }')){this.remove();}  " class="section-3" style="width:60px; height:100px; background:var(--accentColor);"></div>
- 			`;
-    }
+  factoryResetDialog: function () {
     new Dialog({
-      id: "remove_screen",
-      title: current_config.language["Dialog.RemoveScreen.title"],
-      content: `<div style="overflow: auto;min-width: 100%;height: auto;overflow: auto;white-space: nowrap; display:flex;" >${content_editors}</div>`,
+      id: 'factory_reset',
+      title: getTranslation('FactoryReset'),
+      content: getTranslation('FactoryReset-dialog-message'),
       buttons: {
-        [current_config.language["Accept"]]: {}
-      }
-    });
-  },
-  closingFileWarn : function(){
-    new Dialog({
-      id: "saving_file_warn",
-      title: current_config.language["Warn"],
-      content: current_config.language["FileExit-dialog-message"],
-      buttons: {
-        [current_config.language[
-          "FileExit-dialog-button-accept"
-        ]]: {
-          click:()=>{
-            closeTab(ele.getAttribute("tabid"),true);
-          }
-        },
-        [current_config.language["Cancel"]]: {},
-        [current_config.language["FileExit-dialog-button-deny"]]: {
-          click: ()=>{saveFile()},
+        [getTranslation('Decline')]: {},
+        [`${getTranslation('Yes')} , ${
+          getTranslation('Continue')
+        }`]: {
+          click: () => {
+            FactoryReset()
+          },
           important: true
         }
       }
-    });
-  }
-  ,
-  addContextMenu: function(panel) {
-    Object.keys(panel).forEach(function(key) {
-      context_menu_list_text[key] = panel[key];
-    });
+    })
   },
-  toggleFullScreen: function(status) {
-    g_window.setFullScreen(status);
+  removeScreen: function () {
+    let content_editors = ''
+    for (i = 0; i < editor_screens.length; i++) {
+      content_editors += `
+ 			<div onclick="if(screens.remove('${
+  editor_screens[i].id
+}')){this.remove();}  " class="section-3" style="width:60px; height:100px; background:var(--accentColor);"></div>
+ 			`
+    }
+    new Dialog({
+      id: 'remove_screen',
+      title: getTranslation('Dialog.RemoveScreen.title'),
+      content: `<div style="overflow: auto;min-width: 100%;height: auto;overflow: auto;white-space: nowrap; display:flex;" >${content_editors}</div>`,
+      buttons: {
+        [getTranslation('Accept')]: {}
+      }
+    })
   },
-  toggleZenMode: function() {
-    if (editor_mode == "zen") {
-      editor_mode = "normal";
-      document.getElementById("explorer_app").style =
-        "visibility: visible; width:210px; display:block;";
-      document.getElementById("editor_resizer").style = " display:block;";
+  closingFileWarn: function (ele) {
+    new Dialog({
+      id: 'saving_file_warn',
+      title: getTranslation('Warn'),
+      content: getTranslation('FileExit-dialog-message'),
+      buttons: {
+        [getTranslation(
+          'FileExit-dialog-button-accept'
+        )]: {
+          click: () => {
+            closeTab(ele.getAttribute('tabid'), true)
+          }
+        },
+        [getTranslation('Cancel')]: {},
+        [getTranslation('FileExit-dialog-button-deny')]: {
+          click: () => {
+            saveFile()
+          },
+          important: true
+        }
+      }
+    })
+  },
+  addContextMenu: function (panel) {
+    Object.keys(panel).forEach(function (key) {
+      context_menu_list_text[key] = panel[key]
+    })
+  },
+  toggleFullScreen: function (status) {
+    g_window.setFullScreen(status)
+  },
+  toggleZenMode: function () {
+    if (editor_mode == 'zen') {
+      editor_mode = 'normal'
+      document.getElementById('explorer_app').style =
+            'visibility: visible; width:210px; display:block;'
+      document.getElementById('editor_resizer').style = ' display:block;'
     } else {
-      editor_mode = "zen";
-      document.getElementById("explorer_app").style =
-        "visibility: hidden; width:0px; display:none;";
-      document.getElementById("editor_resizer").style = " width:0; display:none;";
+      editor_mode = 'zen'
+      document.getElementById('explorer_app').style =
+            'visibility: hidden; width:0px; display:none;'
+      document.getElementById('editor_resizer').style = ' width:0; display:none;'
     }
   },
-  deleteLog: function() {
-    fs.writeFile(logDir, "[]", err => {});
+  deleteLog: function () {
+    fs.writeFile(logDir, '[]', err => {})
   },
-  toggleAutoCompletation: function() {
-    current_config["autoCompletionPreferences"] =
-      current_config["autoCompletionPreferences"] == "activated"
-        ? "desactivated"
-        : "activated";
+  toggleAutoCompletation: function () {
+    current_config['autoCompletionPreferences'] =
+         current_config['autoCompletionPreferences'] == 'activated'
+           ? 'desactivated'
+           : 'activated'
   },
-  toggleLineWrapping: function() {
-    if (current_config["lineWrappingPreferences"] == "activated") {
+  toggleLineWrapping: function () {
+    if (current_config['lineWrappingPreferences'] == 'activated') {
       for (i = 0; i < editors.length; i++) {
         if (editors[i].editor != undefined) {
-          editors[i].editor.setOption("lineWrapping", false);
-          editors[i].editor.refresh();
+          editors[i].editor.setOption('lineWrapping', false)
+          editors[i].editor.refresh()
         }
       }
-      current_config["lineWrappingPreferences"] = "desactivated";
+      current_config['lineWrappingPreferences'] = 'desactivated'
     } else {
       for (i = 0; i < editors.length; i++) {
         if (editors[i].editor != undefined) {
-          console.log(editors[i].editor);
-          editors[i].editor.setOption("lineWrapping", true);
-          editors[i].editor.refresh();
+          editors[i].editor.setOption('lineWrapping', true)
+          editors[i].editor.refresh()
         }
       }
-      current_config["lineWrappingPreferences"] = "activated";
+      current_config['lineWrappingPreferences'] = 'activated'
     }
   },
-  toggleHighlighting: function() {
-    if (g_highlighting == "activated") {
+  toggleHighlighting: function () {
+    if (g_highlighting == 'activated') {
       for (i = 0; i < editors.length; i++) {
         if (editors[i].editor != undefined) {
-          editors[i].editor.setOption("mode", "text/plain");
-          editors[i].editor.refresh();
+          editors[i].editor.setOption('mode', 'text/plain')
+          editors[i].editor.refresh()
         }
       }
-      g_highlighting = "desactivated";
+      g_highlighting = 'desactivated'
     } else {
       for (i = 0; i < editors.length; i++) {
         if (editors[i].editor != undefined) {
-          updateCodeMode(editors[i].editor, path);
+          updateCodeMode(editors[i].editor, path)
         }
       }
-      g_highlighting = "activated";
+      g_highlighting = 'activated'
     }
   },
-  useSystemAccent: function() {
-    if (current_config.accentColorPreferences == "manual") {
-      current_config["accentColorPreferences"] = "system";
+  useSystemAccent: function () {
+    const tinycolor = require('tinycolor2')
+    if (current_config.accentColorPreferences == 'manual') {
+      current_config['accentColorPreferences'] = 'system'
       try {
         document.documentElement.style.setProperty(
-          "--accentColor",
-          "#" + systemPreferences.getAccentColor()
-        );
+          '--accentColor',
+          '#' + systemPreferences.getAccentColor()
+        )
         document.documentElement.style.setProperty(
-          "--accentDarkColor",
+          '--accentDarkColor',
           tinycolor(systemPreferences.getAccentColor())
             .darken()
             .toString()
-        );
+        )
         document.documentElement.style.setProperty(
-          "--accentLightColor",
+          '--accentLightColor',
           tinycolor(systemPreferences.getAccentColor())
             .brighten()
             .toString()
-        );
-      } catch {
-        //Returns an error = system is not compatible, Linux-based will probably throw that error
+        )
+      } catch (err) {
+        // Returns an error = system is not compatible, Linux-based will probably throw that error
         new Notification({
-          title:"Issue",
-          content:"Your system is not compatible with this feature."
-        });
+          title: 'Warn',
+          content: getTranslation('SystemAccentColor.Error1')
+        })
+        return
+      }
+      if (themeObject.type == 'custom_theme') {
+        new Notification({
+          title: 'Warn',
+          content: getTranslation('SystemAccentColor.Error2')
+        })
       }
     } else {
       document.documentElement.style.setProperty(
-        "--accentColor",
+        '--accentColor',
         themeObject.colors.accentColor
-      );
+      )
       document.documentElement.style.setProperty(
-        "--accentDarkColor",
+        '--accentDarkColor',
         themeObject.colors.accentDarkColor
-      );
+      )
       document.documentElement.style.setProperty(
-        "--accentLightColor",
+        '--accentLightColor',
         themeObject.colors.accentLightColor
-      );
-      current_config["accentColorPreferences"] = "manual";
+      )
+      current_config['accentColorPreferences'] = 'manual'
     }
   },
-  toggleAnimations() {
-    if (current_config.animationsPreferences == "activated") {
-      const style = document.createElement("style");
+  toggleAnimations () {
+    if (current_config.animationsPreferences == 'activated') {
+      const style = document.createElement('style')
       style.innerText = `*{-webkit-transition: none !important;
           -moz-transition: none !important;
           -o-transition: none !important;
           transition: none !important;
-          animation:0;}`;
-      style.id = "_ANIMATIONS";
-      document.documentElement.style.setProperty("--scalation", "1");
-      document.documentElement.appendChild(style);
-      current_config.animationsPreferences = "desactivated";
+          animation:0;}`
+      style.id = '_ANIMATIONS'
+      document.documentElement.style.setProperty('--scalation', '1')
+      document.documentElement.appendChild(style)
+      current_config.animationsPreferences = 'desactivated'
     } else {
-      document.getElementById("_ANIMATIONS").remove();
-      document.documentElement.style.setProperty("--scalation", "0.98");
-      current_config.animationsPreferences = "activated";
+      document.getElementById('_ANIMATIONS').remove()
+      document.documentElement.style.setProperty('--scalation', '0.98')
+      current_config.animationsPreferences = 'activated'
     }
   },
-  setZoom(_value) {
+  setZoom (_value) {
     if (_value >= 0 && _value <= 50) {
-      current_config.appZoom = _value;
-      webFrame.setZoomFactor(current_config.appZoom / 25);
-      saveConfig();
+      current_config.appZoom = _value
+      webFrame.setZoomFactor(current_config.appZoom / 25)
+      saveConfig()
     }
   },
-  editorSearch() {
+  editorSearch () {
     if (editor != undefined) {
-      CodeMirror.commands.find(editor);
+      CodeMirror.commands.find(editor)
     }
   },
-  editorReplace() {
+  editorReplace () {
     if (editor != undefined) {
-      CodeMirror.commands.replace(editor);
+      CodeMirror.commands.replace(editor)
     }
   },
-  editorJumpToLine() {
+  editorJumpToLine () {
     if (editor != undefined) {
-      CodeMirror.commands.jumpToLine(editor);
+      CodeMirror.commands.jumpToLine(editor)
     }
   },
-  restartApp() {
-    remote.app.relaunch();
-    remote.app.exit(0);
+  restartApp () {
+    remote.app.relaunch()
+    remote.app.exit(0)
   },
-  isProduction() {
-    if (
-      path.basename(__dirname) == "Graviton-Editor" ||
-      path.basename(__dirname) == "Graviton-App"
-    ) {
-      return false;
-    } else {
-      return true;
-    }
+  isProduction () {
+    return (path.basename(__dirname) !== 'Graviton-Editor' && path.basename(__dirname) !== 'Graviton-App')
   },
-  resizeTerminals() {
-    for (i = 0; i < editor_screens.length; i++) {
-      if (editor_screens[i].terminal != undefined) {
-        fit.fit(editor_screens[i].terminal.xterm);
-      }
-    }
+  resizeTerminals () {
+    if (terminal != (null||undefined)) fit.fit(terminal.xterm)
   },
-  toggleFullScreen() {
+  toggleFullScreen () {
     if (graviton.isProduction()) {
-      if (g_window.isFullScreen() == false) {
-        g_window.setFullScreen(true);
+      if (g_window.isFullScreen() === false) {
+        g_window.setFullScreen(true)
       } else {
-        g_window.setFullScreen(false);
+        g_window.setFullScreen(false)
       }
     }
   },
-  toggleMenus() {
-    if (menus_showing == true) {
-      document.getElementById("dropmenus_app").style =
-        "visibility:hidden; width:0;";
-      menus_showing = false;
+  toggleMenus () {
+    if (menus_showing === true) {
+      document.getElementById('dropmenus_app').style = 'visibility:hidden; width:0;'
+      menus_showing = false
     } else {
-      document.getElementById("dropmenus_app").style = "";
-      menus_showing = true;
+      document.getElementById('dropmenus_app').style = ''
+      menus_showing = true
     }
   },
-  getPlugin: function(plugin_name) {
+  getPlugin: function (plugin_name) {
     for (i = 0; i < full_plugins.length; i++) {
       if (full_plugins[i].package.name == plugin_name) {
         return {
           repo: full_plugins[i],
-          local: (function() {
+          local: (function () {
             for (let a = 0; a < plugins_list.length; a++) {
               if (plugins_list[a].name == plugin_name) {
-                return plugins_list[a];
+                return plugins_list[a]
               }
             }
-            return undefined;
+            return undefined
           })(),
-          database:(function(){
+          database: (function () {
             for (let a = 0; a < plugins_dbs.length; a++) {
               if (plugins_dbs[a].plugin_name == plugin_name) {
-                return plugins_dbs[a].db;
+                return plugins_dbs[a].db
               }
             }
-            return undefined;
+            return undefined
           })()
-        };
+        }
       }
     }
     for (let a = 0; a < plugins_list.length; a++) {
@@ -615,461 +647,316 @@ const graviton = {
         return {
           local: plugins_list[a],
           repo: undefined
-        };
+        }
       }
     }
   },
-  windowContent(id, content) {
-    document.getElementById(`${id}_body`).innerHTML = content;
-  },
-  toggleBounceEffect(){
-    if(current_config.bouncePreferences == "activated"){
-      current_config.bouncePreferences = "desactivated"
-    }else{
-      current_config.bouncePreferences = "activated"
-    }
-  },
-  changeLanguageStatusBar(lang,screen){
-    const lang_ele =  document.getElementById(screen).children[2].children[0];
-    if( lang_ele.innerText==""){
-      lang_ele.style = "";
-    }
-    if(lang == ""){
-      lang_ele.style = "padding:0px;";
-    }
-    lang_ele.setAttribute("title",`Current: ${lang} ${plang=="Unknown"?'(Unkown)':''}`)
-    lang_ele.innerText = lang;
-  },
-  toggleMiniMap(){
-    if(current_config.miniMapPreferences=='activated'){
-      current_config.miniMapPreferences='desactivated'
-      if(tabs.length==0) return; //Doesn't need to throw the warn notification since there is any tab opened
-      new Notification({
-        title:getTranslation('MiniMap'),
-        content:getTranslation('MiniMapDisabled'),
-        buttons:{
-          [getTranslation('Later')]:{
-            click:{}
-          },
-          [getTranslation('Restart')]:{
-            click:function(){
-              graviton.restartApp()
-            }
-          }
-        }
+  getTypePlugin(config){
+      if (config.icons!=undefined) {
+        return "custom_theme"
+      }
+      if (config.css!=undefined) {
+        return "custom_theme"
+      }
+      if (config.colors!=undefined) {
+        return "theme"
+      }
+      if (config.main!=undefined) {
+        return "plugin"
+      }
 
-      })
-    }else{
-      current_config.miniMapPreferences='activated'
-      editors.forEach((_editor)=>_editor.editor!=undefined?_editor.editor.setOption("miniMap",true):null)
+  },
+  windowContent (id, content) {
+    document.getElementById(`${id}_body`).innerHTML = content
+  },
+  toggleBounceEffect () {
+    if (current_config.bouncePreferences == 'activated') {
+      current_config.bouncePreferences = 'desactivated'
+    } else {
+      current_config.bouncePreferences = 'activated'
     }
+  },
+  setTitle (title) {
+    if (graviton.currentOS().codename == 'win32') {
+      document.getElementById('title_directory').children[0].innerText =
+            title + ' · Graviton'
+    } else {
+      g_window.setTitle(title + ' · Graviton')
+    }
+  },
+  consoleInfo (message) {
+    console.log('%c INFO::', 'color:#0066FF;', message)
+  },
+  consoleWarn (message) {
+    console.log('%c WARN::', 'color:#F6B149;', message)
+  },
+  getTemplate (name, code) {
+    const result = `${code != undefined ? code : ''} ${templates[name]}`
+    try {
+      eval(result)
+    } catch (error) {
+      graviton.throwError('Cannot load the current template: ' + error);
+      if(!graviton.isProduction()){
+        console.log(result)
+      }
+      return ''
+    }
+    return eval(result)
+  },
+  focusScreen (screen_id) {
+    for (i = 0; i < editor_screens.length; i++) {
+      if (editor_screens[i].id == screen_id) {
+        current_screen.id = screen_id
+      }
+    }
+  },
+  getTerminal(){
+    /*
+      This is to avoid API issues whern there are breaking changes.
+    */
+    return terminal;
+  },
+  getLanguage(){
+    return getLanguageName(
+      getFormat(path.basename(graviton.getCurrentFile().path)).lang != "unknown"
+        ? getFormat(path.basename(graviton.getCurrentFile().path)).lang
+        : path
+            .basename(graviton.getCurrentFile().path)
+            .split(".")
+            .pop()
+    )
   }
-};
-
-function floatingWindow([xSize, ySize], content) {
-  //Method to create flaoting windows
-  const g_floating_window = document.createElement("div");
-  g_floating_window.style.height = ySize + "px";
-  g_floating_window.style.width = xSize + "px";
-  g_floating_window.classList = "floating_window";
-  g_floating_window.innerHTML = content;
-  document.body.appendChild(g_floating_window);
 }
-document.addEventListener("mousedown", function(event) {
+
+function floatingWindow ([xSize, ySize], content) {
+  // Method to create flaoting windows
+  const floating_window = document.createElement('div')
+  floating_window.style.height = ySize + 'px'
+  floating_window.style.width = xSize + 'px'
+  floating_window.classList = 'floating_window'
+  floating_window.innerHTML = content
+  document.body.appendChild(floating_window)
+}
+document.addEventListener('mousedown', function (event) {
   if (editor_booted === true) {
     if (event.button === 2) {
-      if (document.getElementById("context_menu") !== null) {
-        document.getElementById("context_menu").remove();
+      graviton.closeDropmenus() // Close opened dropmenu
+      if (document.getElementById('context_menu') !== null) {
+        document.getElementById('context_menu').remove()
       }
-      const context_menu = document.createElement("div");
-      const line_space = document.createElement("span");
-      line_space.classList = "line_space_menus";
-      context_menu.setAttribute("id", "context_menu");
+      const context_menu = document.createElement('div')
+      const line_space = document.createElement('span')
+      line_space.classList = 'line_space_menus'
+      context_menu.setAttribute('id', 'context_menu')
       context_menu.style = `left:${event.pageX + 1}px; top:${event.pageY +
-        1}px`;
-      switch (event.target.getAttribute("elementType")) {
-        case "directorie":
-          Object.keys(context_menu_list_directories).forEach(function(
+        1}px`
+      switch (event.target.getAttribute('elementType')) {
+        case 'file':
+          Object.keys(context_menu_list_file).forEach(function (
             key,
             index
           ) {
-            if(context_menu_list_directories[key]!="*line"){
-              const button = document.createElement("button");
-              button.classList.add("part_of_context_menu");
-              button.innerText = getTranslation(key);
-              button.setAttribute("target", event.target.id);
-              context_menu.appendChild(button);
+            if (context_menu_list_file[key] != '*line') {
+              const button = document.createElement('button')
+              button.classList.add('part_of_context_menu')
+              button.innerText = getTranslation(key)
+              button.setAttribute('target', event.target.id)
+              context_menu.appendChild(button)
               sleeping(1).then(() => {
-                button.onclick = context_menu_list_directories[key];
-              });
-            }else{
-              const span = document.createElement("span");
-              span.classList = 'line_space_menus';
+                button.onclick = context_menu_list_file[key]
+              })
+            } else {
+              const span = document.createElement('span')
+              span.classList = 'line_space_menus'
               context_menu.appendChild(span)
             }
-          });
-          break;
-        case "tab":
-          Object.keys(context_menu_list_tabs).forEach(function(key, index) {
-            if(context_menu_list_tabs[key]!="*line"){
-              const button = document.createElement("button");
-              button.classList.add("part_of_context_menu");
-              button.innerText = getTranslation(key);
-              button.setAttribute("target", event.target.id);
-              context_menu.appendChild(button);
+          })
+          break
+        case 'tab':
+          Object.keys(context_menu_list_tabs).forEach(function (key, index) {
+            if (context_menu_list_tabs[key] != '*line') {
+              const button = document.createElement('button')
+              button.classList.add('part_of_context_menu')
+              button.innerText = getTranslation(key)
+              button.setAttribute('target', event.target.id)
+              context_menu.appendChild(button)
               sleeping(1).then(() => {
-                button.onclick = context_menu_list_tabs[key];
-              });
-            }else{
-              const span = document.createElement("span");
-              span.classList = 'line_space_menus';
+                button.onclick = context_menu_list_tabs[key]
+              })
+            } else {
+              const span = document.createElement('span')
+              span.classList = 'line_space_menus'
               context_menu.appendChild(span)
             }
-          });
-          break;
-        case "directory":
-          Object.keys(context_menu_directory_options).forEach(function(
+          })
+          break
+        case 'directory':
+          Object.keys(context_menu_directory_options).forEach(function (
             key,
             index
           ) {
-            if(context_menu_directory_options[key]!="*line"){
-              const button = document.createElement("button");
-              button.classList.add("part_of_context_menu");
-              button.innerText = getTranslation(key);
-              button.setAttribute("target", event.target.id);
-              
+            if (context_menu_directory_options[key] != '*line') {
+              const button = document.createElement('button')
+              button.classList.add('part_of_context_menu')
+              button.innerText = getTranslation(key)
+              button.setAttribute('target', event.target.id)
+
               sleeping(1).then(() => {
-                button.addEventListener("click",context_menu_directory_options[key]) 
-              });
-              context_menu.appendChild(button);
-            }else{
-              const span = document.createElement("span");
-              span.classList = 'line_space_menus';
+                button.addEventListener('click', context_menu_directory_options[key])
+              })
+              context_menu.appendChild(button)
+            } else {
+              const span = document.createElement('span')
+              span.classList = 'line_space_menus'
               context_menu.appendChild(span)
             }
-          });
-          break;
+          })
+          break
         default:
-          Object.keys(context_menu_list_text).forEach(function(key, index) {
-            if(context_menu_list_text[key]!="*line"){
-              const button = document.createElement("button");
-              button.classList.add("part_of_context_menu");
+          Object.keys(context_menu_list_text).forEach(function (key, index) {
+            if (context_menu_list_text[key] != '*line') {
+              const button = document.createElement('button')
+              button.classList.add('part_of_context_menu')
               if (index < 2) {
-                button.innerText = getTranslation(key);
-                context_menu.appendChild(button);
+                button.innerText = getTranslation(key)
+                context_menu.appendChild(button)
               } else {
                 if (index == 2) {
-                  context_menu.appendChild(line_space);
+                  context_menu.appendChild(line_space)
                 }
-                button.innerText = key;
-                context_menu.appendChild(button);
+                button.innerText = key
+                context_menu.appendChild(button)
               }
               sleeping(1).then(() => {
-                button.onclick = context_menu_list_text[key];
-              });
-            }else{
-              const span = document.createElement("span");
-              span.classList = 'line_space_menus';
+                button.onclick = context_menu_list_text[key]
+              })
+            } else {
+              const span = document.createElement('span')
+              span.classList = 'line_space_menus'
               context_menu.appendChild(span)
             }
-          });
+          })
       }
-      document.body.appendChild(context_menu);
+      document.body.appendChild(context_menu)
     } else if (
       event.button === 0 &&
-      !(
-        event.target.matches("#context_menu") ||
-        event.target.matches(".part_of_context_menu")
-      ) &&
-      document.getElementById("context_menu") !== null
+         !(
+           event.target.matches('#context_menu') ||
+            event.target.matches('.part_of_context_menu')
+         ) &&
+         document.getElementById('context_menu') !== null
     ) {
-      document.getElementById("context_menu").remove();
+      document.getElementById('context_menu').remove()
     }
-    if (!event.target.matches(".floating_window")) {
-      if (document.getElementsByClassName("floating_window").length != 0) {
+    if (!event.target.matches('.floating_window')) {
+      if (document.getElementsByClassName('floating_window').length != 0) {
         for (
-          i = 0;
-          i < document.getElementsByClassName("floating_window").length;
-          i++
+          i = 0; i < document.getElementsByClassName('floating_window').length; i++
         ) {
-          document.getElementsByClassName("floating_window")[i].remove();
+          document.getElementsByClassName('floating_window')[i].remove()
         }
       }
     }
   }
-});
+})
 
-class commander {
-  constructor(object, callback) {
-    if (document.getElementById(current_screen.id).children[3] != undefined) {
-      return callback(true);
-    }
-    this.id = object.id + "_commander";
-    this.content = object.content;
-    const commanderObj = document.createElement("div");
-    commanderObj.id = this.id;
-    commanderObj.classList = "commander";
-    commanderObj.innerHTML = object.content;
-    document.getElementById(current_screen.id).appendChild(commanderObj);
-    return callback(false);
-  }
-  close() {
-    document.getElementById(this.id).remove();
-  }
-  hide() {
-    document.getElementById(this.id).style.display = "none";
-  }
-  show() {
-    document.getElementById(this.id).style = "";
+window.onresize = function () {
+  graviton.resizeTerminals()
+}
+
+graviton.copyText = (content) => {
+  const text = document.createElement('textarea')
+  text.style = 'height:0.1px; width:0.1px; opacitiy:0; padding:0; border:0; margin:0; outline:0;'
+  text.innerText = content
+  document.body.appendChild(text)
+  text.focus()
+  text.select()
+  document.execCommand('copy')
+  text.remove()
+}
+
+const preload = array => {
+  // Preload images when booting
+  for (i = 0; i < array.length; i++) {
+    document.body.innerHTML += `
+     <img id="${array[i]}"src="${array[i]}" style="visibility:hidden;"></img>`
+    document.getElementById(array[i]).remove()
   }
 }
-const commanders = {
-  terminal: function(object) {
-    if (graviton.getCurrentDirectory() == null && object == undefined) {
-      graviton.throwError(
-        current_config.language["CannotRunTerminalCauseDirectory"]
-      );
-      return;
-    }
-    if (current_screen.terminal != undefined) {
-      if(document.getElementById(current_screen.terminal.id+'_commander').style.display=="none"){
-        commanders.show(current_screen.terminal.id);
-      }
-      return;
-    }
-    const randomID = Math.random();
-    new commander(
-      {
-        id: "xterm" + randomID,
-        content: ""
-      },
-      function(err) {
-        if (!err) {
-          const shell =
-            process.env[_os.platform() === "win32" ? "COMSPEC" : "SHELL"];
-          const ptyProcess = pty.spawn(shell, [], {
-            cwd:
-              object == undefined
-                ? graviton.getCurrentDirectory()
-                : object.path,
-            env: process.env
-          });
-          const xterm = new Terminal({
-            rows: "10",
-            theme: {
-              background: themeObject.colors[
-                "editor-background-color"
-              ],
-              foreground: themeObject.colors["white-black"]
-            }
-          });
-          xterm.open(
-            document.getElementById("xterm" + randomID + "_commander")
-          );
-          xterm.on("data", data => {
-            ptyProcess.write(data);
-          });
-          ptyProcess.on("data", function(data) {
-            xterm.write(data);
-          });
-          graviton.resizeTerminals();
-          for (i = 0; i < editor_screens.length; i++) {
-            if (editor_screens[i].id == current_screen.id) {
-              editor_screens[i].terminal = {
-                id: "xterm" + randomID,
-                xterm: xterm
-              };
-              current_screen.terminal = editor_screens[i].terminal;
-              const new_terminal_event = new CustomEvent("new_terminal", {
-                detail: {
-                  terminal: current_screen.terminal
-                }
-              });
-              document.dispatchEvent(new_terminal_event);
-              graviton.resizeTerminals();
-              return;
-            }
-          }
-        }
-      }
-    );
-  },
-  hide: function(id) {
-    document.getElementById(id + "_commander").style.display = "none";
-  },
-  show: function(id) {
-    console.log(id)
-    document.getElementById(id + "_commander").style = "";
-  },
-  close: function(id) {
-    document.getElementById(id + "_commander").remove();
-  },
-  closeTerminal: function() {
-    for (i = 0; i < editor_screens.length; i++) {
-      if (editor_screens[i].id == current_screen.id) {
-        const closed_terminal_event = new CustomEvent("closed_terminal", {
-          detail: {
-            terminal: editor_screens[i].terminal
-          }
-        });
-        document.dispatchEvent(closed_terminal_event);
-        if (editor_screens[i].terminal != undefined) {
-          editor_screens[i].terminal.xterm.destroy();
-          commanders.close(current_screen.terminal.id);
-        }
-        editor_screens[i].terminal = undefined;
-        current_screen.terminal = undefined;
-        graviton.resizeTerminals();
-      }
+
+graviton.changeExplorerPosition = (position) => {
+  const content_app = document.getElementById('content_app')
+  if (position === 'right') {
+    content_app.setAttribute('explorerPosition', 'right')
+    content_app.insertBefore(document.getElementById('editors'), content_app.children[0])
+    content_app.insertBefore(document.getElementById('explorer_app'), content_app.children[3])
+  } else {
+    content_app.setAttribute('explorerPosition', 'left')
+    content_app.insertBefore(document.getElementById('explorer_app'), content_app.children[0])
+    content_app.insertBefore(document.getElementById('editors'), content_app.children[3])
+  }
+  current_config.explorerPosition = position
+}
+
+graviton.setEditorFontSize = function (new_size) {
+  current_config.fontSizeEditor = `${new_size}`
+  if (Number(current_config.fontSizeEditor) < 5) {
+    current_config.fontSizeEditor = '5'
+  }
+  document.documentElement.style.setProperty(
+    '--editor-font-size',
+    `${current_config.fontSizeEditor}px`
+  ) // Update settings from window
+  for (i = 0; i < editors.length; i++) {
+    if (editors[i].editor != undefined) editors[i].editor.refresh()
+  }
+  saveConfig()
+}
+
+graviton.loadControlButtons = () => {
+  if (graviton.currentOS().codename == 'win32') {
+    document.getElementById('controls').innerHTML = graviton.getTemplate('control_buttons')
+    g_window.on('maximize', (e, cmd) => {
+      const button = document.getElementById('maximize')
+      button.setAttribute('onclick', 'g_window.unmaximize();')
+    })
+    g_window.on('unmaximize', (e, cmd) => {
+      const button = document.getElementById('maximize')
+      button.setAttribute('onclick', 'g_window.maximize();')
+    })
+  } else {
+    document.getElementById('controls').innerHTML = ' '
+    document.getElementById('controls').setAttribute('os', 'not_windows')
+  }
+}
+
+graviton.closeDropmenus = function () {
+  const dropdowns = document.getElementsByClassName('dropdown-content')
+  for (i = 0; i < dropdowns.length; i++) {
+    const openDropdown = dropdowns[i]
+    if (openDropdown.classList.contains('show')) {
+      openDropdown.classList.replace('show', 'hide')
+      anyDropON = null
     }
   }
-};
-const screens = {
-  add: function() {
-    const current_id = `screen_${editor_screens.length + Math.random()}`;
-    const new_screen_editor = document.createElement("div");
-    new_screen_editor.classList = "g_editors";
-    new_screen_editor.id = current_id;
-    new_screen_editor.innerHTML = `
-      <div class="g_tabs_bar flex smallScrollBar"></div>  
-      <div class="g_editors_editors" >
-     <div class=temp_dir_message> 
-        <p dragable=false class="translate_word " idT="WelcomeMessage" >${
-          current_config.language["WelcomeMessage"]
-        }</p>
-        <img draggable="false" class="emoji-normal" src="src/openemoji/1F60E.svg"> 
-      </div>
-      </div>
-      <div class="g_status_bar" >
-        <span></span>
-      </div>`;
-    document
-      .getElementById("content_app")
-      .insertBefore(
-        new_screen_editor,
-        document.getElementById("content_app").children[
-          document.getElementById("content_app").children.length - 1
-        ]
-      );
-    current_screen = { id: current_id, terminal: undefined };
-    const screen = {
-      id: current_screen.id,
-      terminal: undefined
-    };
-    editor_screens.push(screen);
-    new_screen_editor.addEventListener(
-      "click",
-      function(event) {
-        for (i = 0; i < editor_screens.length; i++) {
-          if (editor_screens[i].id == this.id) {
-            current_screen.id = this.id;
-            current_screen.terminal = editor_screens[i].terminal;
-          }
-        }
-      },
-      false
-    );
-    const split_screen_event = new CustomEvent("split_screen", {
-      detail: {
-        screen: current_screen
-      }
-    });
-    document.dispatchEvent(split_screen_event);
-    graviton.resizeTerminals();
-  },
-  remove: function(id) {
-    if (editor_screens.length != 1) {
-      for (i = 0; i < editor_screens.length; i++) {
-        if (editor_screens[i].id == id) {
-          let tabs2 = [];
-          for (b = 0; b < tabs.length; b++) {
-            if (tabs[b].getAttribute("screen") == id) {
-              tabs2.push(tabs[b]);
-            }
-          }
-          if (tabs2.length == 0) {
-            if (editor_screens[i].terminal != undefined) {
-              editor_screens[i].terminal.xterm.destroy();
-              commanders.close(editor_screens[i].terminal.id);
-              editor_screens[i].terminal = undefined;
-            }
-            const closed_screen_event = new CustomEvent("closed_screen", {
-              detail: {
-                screen: editor_screens[i]
-              }
-            });
-            document.dispatchEvent(closed_screen_event);
-            document.getElementById(id).remove();
-            editor_screens.splice(i, 1);
-            editors.splice(i, 1);
-            current_screen = {
-              id: editor_screens[editor_screens.length - 1].id,
-              terminal: editor_screens[editor_screens.length - 1].terminal
-            };
-            return true;
-          } else {
-            graviton.throwError(
-              getTranslation("Notification.CloseAllTabsBefore")
-            );
-            return false;
-          }
-          return;
-        }
-      }
-      graviton.resizeTerminals();
-    } else {
-      graviton.throwError(
-        getTranslation("Notification.CannotRemoveMoreScreens")
-      );
-      return false;
-    }
-  },
-  default: function() {
-    for (i = 0; i < editor_screens.length; i++) {
-      if (i != 0) {
-        let tabs2 = [];
-        const number = i;
-        for (b = 0; b < tabs.length; b++) {
-          if (tabs[b].getAttribute("screen") == editor_screens[number].id) {
-            tabs2.push(tabs[b]);
-          }
-        }
-        if (tabs2.length == 0) {
-          if (editor_screens[number].terminal != undefined) {
-            editor_screens[number].terminal.xterm.destroy();
-            commanders.close(editor_screens[number].terminal.id);
-            editor_screens[i].terminal = undefined;
-          }
-          document.getElementById(editor_screens[number].id).remove();
-          editor_screens.splice(number, 1);
-          editors.splice(number, 1);
-          current_screen = {
-            id: editor_screens[editor_screens.length - 1].id,
-            terminal: editor_screens[editor_screens.length - 1].terminal
-          };
-          i--;
-        } else {
-          graviton.throwError(
-            current_config.language["Notification.CloseAllTabsBefore"]
-          );
-        }
-      }
-    }
+}
+
+function Control({text,hint}){
+  this.text = text;
+  const controlSpan = document.createElement("span");
+  controlSpan.innerText = text;
+  if(hint!=undefined) controlSpan.title = hint;
+  document.getElementById(current_screen.id).children[2].appendChild(controlSpan);
+  this.setText = (newText)=>{
+    controlSpan.innerText = newText;
   }
-};
-window.onresize = function() {
-  graviton.resizeTerminals();
-};
-
-
-
-function copyText(content){
-  const text = document.createElement("textarea");
-  text.style="height:0.1px; width:0.1px; opacitiy:0; padding:0; border:0; margin:0; outline:0;";
-  text.innerText = content;
-  document.body.appendChild(text);
-  text.focus();
-  text.select();
-  document.execCommand('copy');
-  text.remove();
+  this.setHint = (newHint)=>{
+    controlSpan.title = newHint;
+  }
+  this.hide = ()=>{
+    controlSpan.style.display = "none";
+  }
+  this.show = ()=>{
+    controlSpan.style.display = "block";
+  }
 }
